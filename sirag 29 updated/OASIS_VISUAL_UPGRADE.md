@@ -1,0 +1,1 @@
+Milestone 19: improved offline 2.5D canvas scene with layered atmospheric dunes, sunlight, textured sand, organic leaves, detailed palms, vignette. All five same-day planting steps retained. This is not a true 3D renderer and not photorealistic; full 3D requires a separate rendering/asset pipeline.

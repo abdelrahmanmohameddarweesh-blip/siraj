@@ -1,0 +1,1 @@
+Sirag Milestone 7: Splash code-only implementation correction. Background includes branding/tagline. Native CTA only. Existing homepage/analytics/desert preserved. The source artwork has been cropped to remove baked status bar and CTA.

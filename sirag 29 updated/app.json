@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Sirag | سراج",
+    "slug": "sirag",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sirag.livingdesert",
+      "infoPlist": {
+        "UIBackgroundModes": [
+          "audio"
+        ]
+      }
+    },
+    "android": {
+      "package": "com.sirag.livingdesert"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-localization",
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/athan.wav"
+          ],
+          "color": "#1d5c49"
+        }
+      ]
+    ],
+    "scheme": "sirag"
+  }
+}
