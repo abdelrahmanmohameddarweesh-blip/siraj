@@ -44,7 +44,7 @@ export default function OasisScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { isRestDayToday } = usePrayer();
   const [sheetPrayer, setSheetPrayer] = useState<PrayerId | null>(null);
-  const web = useRef<WebView>(null);
+  const web = useRef<WebView<{}>>(null);
   const ready = useRef(false);
   const ledgerRef = useRef<Ledger | null>(null);
   const stateRef = useRef<any>(null);
@@ -163,9 +163,9 @@ export default function OasisScreen({ navigation }: any) {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" />
       {init ? (
-        <WebView
+        <WebView<{}>
           ref={web}
           style={styles.web}
           originWhitelist={['*']}

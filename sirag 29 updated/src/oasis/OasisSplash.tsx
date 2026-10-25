@@ -92,7 +92,7 @@ export default function OasisSplash({ navigation }: any) {
   }
 
   return <View style={styles.root}>
-    <StatusBar barStyle="light-content" backgroundColor="#082B2A" />
+    <StatusBar barStyle="light-content" />
     <LinearGradient colors={['#082B2A', '#103C36', '#071F20']} style={StyleSheet.absoluteFill} />
     <Animated.View pointerEvents="none" style={[styles.aura, { opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [.18, .35] }) }]} />
     <ScrollView bounces={false} contentContainerStyle={[styles.page, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 20, minHeight: height }]}>

@@ -90,7 +90,7 @@ export default function SiragHome({ navigation }: any) {
 
   return (
     <View style={s.root}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 + insets.bottom }}>
         {/* living oasis hero */}
         <View style={[s.hero, { height: 420 + insets.top }]}>

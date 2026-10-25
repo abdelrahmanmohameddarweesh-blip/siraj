@@ -14,7 +14,7 @@ export default function FirstBloomScreen({ navigation }:any) {
   const { language } = useLanguage();
   const ar = language === 'ar';
   const t = (a:string,e:string) => ar ? a : e;
-  const web = useRef<WebView>(null);
+  const web = useRef<WebView<{}>>(null);
   const [ready,setReady] = useState(false);
   const [loaded,setLoaded] = useState(false);
   const [bloomed,setBloomed] = useState(false);
@@ -65,7 +65,7 @@ export default function FirstBloomScreen({ navigation }:any) {
       <Text style={styles.headerSymbol}>✧</Text>
     </View>
     <View style={styles.scene}>
-      <WebView ref={web} source={{html:FIRST_BLOOM_HTML,baseUrl:'https://localhost/'}} originWhitelist={['*']} javaScriptEnabled domStorageEnabled
+      <WebView<{}> ref={web} source={{html:FIRST_BLOOM_HTML,baseUrl:'https://localhost/'}} originWhitelist={['*']} javaScriptEnabled domStorageEnabled
         onMessage={onMessage} onError={()=>setError(t('تعذر فتح المشهد ثلاثي الأبعاد.','3D scene could not load.'))}
         scrollEnabled={false} bounces={false} style={{backgroundColor:'#061d19',flex:1}} overScrollMode="never" />
       {(!ready || !loaded) && <View style={styles.loader}><ActivityIndicator color="#E6C477"/><Text style={styles.help}>{t('نجهّز عالمك الحي...','Preparing your living world...')}</Text></View>}
