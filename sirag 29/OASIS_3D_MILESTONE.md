@@ -1,0 +1,1 @@
+Milestone: offline WebGL raymarched 3D oasis. Touch navigation and all five care stages remain wired to existing AsyncStorage-backed React Native flow. No remote 3D assets or extra npm dependencies. Requires WebGL-enabled WebView. This is procedural real-time 3D, not photorealistic asset-quality terrain. iPhone GPU performance not yet verified.

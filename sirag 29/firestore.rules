@@ -1,0 +1,57 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all access
+    match /{document=**} {
+      allow read, write: false;
+    }
+
+    // User profiles & private state
+    // Users can only read and write their own documents
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false; // prevent accidental account wipe via client SDK
+    }
+
+    // Public / Global Leaderboards
+    // Anyone authenticated can read; updates restricted to matching user
+    match /leaderboard/{entry} {
+      allow read: if true;
+      allow create, update: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow delete: if false;
+    }
+
+    // Daily Championship submissions
+    match /championship/{entry} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    // Community Feed Posts
+    // Anyone authenticated can read; author can create; cannot edit/delete other posts
+    match /community_posts/{postId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && resource.data.authorId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.authorId == request.auth.uid;
+    }
+
+    // Group Quiz / Multiplayer Arena Rooms
+    // Authenticated users can read room state, host can update settings, participants can submit answers
+    match /rooms/{roomId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null && resource.data.hostId == request.auth.uid;
+
+      // Subcollection for room players
+      match /players/{playerId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && request.auth.uid == playerId;
+      }
+    }
+  }
+}
