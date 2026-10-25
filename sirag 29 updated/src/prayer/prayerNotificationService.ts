@@ -67,6 +67,7 @@ export async function setupNotificationChannelsAndCategories(): Promise<void> {
  */
 export async function requestNotificationPermission(): Promise<boolean> {
   try {
+    await setupNotificationChannelsAndCategories();
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
@@ -100,8 +101,10 @@ export async function getNotificationConfig(): Promise<PrayerNotificationConfig>
 export async function saveNotificationConfig(config: PrayerNotificationConfig): Promise<void> {
   try {
     await AsyncStorage.setItem(STORAGE_KEYS.CONFIG, JSON.stringify(config));
+    syncNotificationsSoon();
   } catch (err) {
     console.warn('[PrayerNotifications] Error saving config:', err);
+    throw err;
   }
 }
 

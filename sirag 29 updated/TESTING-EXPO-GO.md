@@ -14,4 +14,15 @@ The first launch shows “ابدأ رحلتك”. Returning users continue autom
 
 SDK migration notes: Expo native dependencies, React, React Native and Babel preset match SDK 58. Removed obsolete StatusBar background/translucency props for React Native 0.88 and supplied WebView's explicit props generic for its current TypeScript declarations.
 
-Cloud validation: Expo resolves SDK 58.0.0, TypeScript passes, all 37 existing tests pass, and full iOS and web exports succeed with the supplied fonts and audio. Device testing is still needed for appearance, camera, notifications, audio and navigation. Remote push notifications and custom native notification sounds require a development build where Expo Go does not support them.
+Cloud validation: Expo resolves SDK 58.0.0, TypeScript passes, all 54 tests pass, and full iOS, Android and web exports succeed with the supplied fonts and audio. Device testing is still needed for appearance, camera, notifications, audio and navigation. Remote push notifications and custom native notification sounds require a development build where Expo Go does not support them.
+
+
+## New profile, reminders and reports
+
+The splash uses the bundled Aref Ruqaa font and has no English subtitle. After continuing, a missing profile opens the required name/gender form. The profile saves on-device first and syncs privately to Firebase when available. See `FIREBASE-AND-NOTIFICATIONS.md` for the required Firebase console setup; a pending sync is shown honestly in Reports.
+
+Home → **تنبيهات الصلاة** configures before/at/after reminders for each prayer. Home → **إحصائياتي** shows 7/30-day reports, daily detail, profile editing and sync status. Selecting the prayer habit opens reminder customization.
+
+For a clean first-time test on web use a private browser window. For an existing phone install, do not clear app storage unless you accept losing local worship history; missing profiles are requested automatically. Prayer data, Athkar, confirmed pages, listening and Hifz are preserved under the existing storage keys.
+
+Checks run on this update: TypeScript; 54 unit/regression tests; full iOS, Android and web exports; browser checks of splash/profile validation and persistence, returning-user home, reports, profile editing and reminder persistence, prayer confirmation, Athkar counting and unique Quran page confirmation. Firebase requests are blocked in browser tests, so no test users or fake personal data are written to the live database. Custom adhan delivery and sound still require a signed native-device test.

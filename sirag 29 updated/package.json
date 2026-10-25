@@ -9,7 +9,7 @@
     "android": "npx expo start --android",
     "ios": "npx expo start --ios",
     "web": "npx expo start --web",
-    "test": "npx tsx --test test/*.test.ts",
+    "test": "tsx --test test/*.test.ts",
     "build:oasis": "python3 scripts/build-oasis-html.py prototype/sirag-oasis.html src/oasis/oasisHtml.ts",
     "web:preview": "npx expo export -p web --output-dir dist-web && npx serve dist-web"
   },
@@ -34,7 +34,7 @@
     "expo-notifications": "~58.1.6",
     "expo-sensors": "~58.0.4",
     "expo-sharing": "~58.0.20",
-    "firebase": "9.22.0",
+    "firebase": "9.23.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.0",
@@ -55,6 +55,7 @@
     "@types/react": "~19.2.4",
     "@types/react-native": "0.71.11",
     "babel-preset-expo": "~58.0.20",
+    "tsx": "4.23.15",
     "typescript": "~6.0.3"
   }
 }

@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CATEGORIES, HabitDef, LIBRARY, MOMENTS, PlanPreset, Answers, anchorLabel, planFromPreset, recommend } from './library';
 import { HabitPlan, HabitReminder, ReminderAnchor } from './habitData';
 import { readPlans, savePlan } from './habitLog';
+import { usePrayer } from '../prayer/PrayerContext';
 import { requestPermissionAndSync } from '../notifications/scheduler';
 import { C, F, ar } from '../ui/theme';
 
@@ -16,6 +17,7 @@ const CLOCKS = ['06:00', '08:00', '10:00', '12:00', '17:00', '19:00', '21:00', '
 
 export default function HabitLibraryScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
+  const { updateNotifications } = usePrayer();
   const first = !!route?.params?.first;
   const [step, setStep] = useState<Step>('browse');
   const [search, setSearch] = useState('');
@@ -51,8 +53,7 @@ export default function HabitLibraryScreen({ navigation, route }: any) {
     setSaving(true);
     try {
       if (def.kind === 'prayers') {
-        let cfg: any = {}; try { cfg = JSON.parse((await AsyncStorage.getItem(CONFIG_KEY)) || '{}'); } catch { cfg = {}; }
-        await AsyncStorage.setItem(CONFIG_KEY, JSON.stringify({ ...cfg, notificationsEnabled: true, checkinFollowUpEnabled: chosen.id !== 'gentle', preAlertMin: chosen.id === 'strong' ? 10 : 0 }));
+        await updateNotifications({ notificationsEnabled: true, checkinFollowUpEnabled: chosen.id !== 'gentle', preAlertMin: chosen.id === 'strong' ? 10 : 0, preAlertByPrayer: {}, followUpMin: {} });
       }
       const preset: PlanPreset = custom ? {
         ...chosen, target, frequency, ramp: gradual && chosen.ramp ? { ...chosen.ramp, max: target } : undefined,
@@ -62,7 +63,8 @@ export default function HabitLibraryScreen({ navigation, route }: any) {
       await savePlan(plan);
       await AsyncStorage.setItem('sirag-onboarding-complete-v1', 'yes');
       if (plan.reminders?.length || def.kind === 'prayers') await requestPermissionAndSync();
-      first ? navigation.replace('Oasis') : navigation.goBack();
+      if (def.kind === 'prayers') navigation.replace('PrayerReminders', { nextRoute: first ? 'Oasis' : 'Home' });
+      else first ? navigation.replace('Oasis') : navigation.goBack();
     } catch { Alert.alert('تعذّر الحفظ', 'حاول مرة أخرى'); }
     finally { setSaving(false); }
   };

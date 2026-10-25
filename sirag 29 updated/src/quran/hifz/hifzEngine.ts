@@ -53,6 +53,7 @@ export const PASS_SCORE = 0.8;
 /** Records a test of today's verses; passing adds them to review and moves the cursor on. */
 export function completeToday(st: HifzState, day: string, score: number, lengths: number[]): { state: HifzState; passed: boolean; learned: number } {
   const today = st.today && st.today.day === day ? st.today : { day, keys: [], passed: false, best: 0 };
+  if (!Number.isFinite(score) || score < 0 || score > 1 || !today.keys.length) return { state: st, passed: false, learned: 0 };
   const best = Math.max(today.best, score);
   if (today.passed || score < PASS_SCORE) return { state: { ...st, today: { ...today, best } }, passed: today.passed, learned: 0 };
   const items = { ...st.items };

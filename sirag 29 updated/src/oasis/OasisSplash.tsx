@@ -5,6 +5,7 @@ import Svg, { Circle, Defs, Ellipse, G, LinearGradient as SvgGradient, Path, Rad
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { oasisWaiting } from './oasisStatus';
+import { loadProfile } from '../profile/profileStore';
 import { launch } from '../notifications/launchState';
 
 const GOLD = '#E8C581';
@@ -85,23 +86,29 @@ export default function OasisSplash({ navigation }: any) {
     if (started.current || returning === null || launch.fromNotification) return;
     started.current = true;
     setLeaving(true);
-    if (!returning) { navigation.replace('HabitSetup', { first: true }); return; }
     let waiting = 0;
     try { waiting = (await oasisWaiting()).newRewards; } catch { /* Home remains available offline. */ }
-    if (!launch.fromNotification) navigation.replace(waiting > 0 ? 'Oasis' : 'Home');
+    const nextRoute = !returning ? 'HabitSetup' : waiting > 0 ? 'Oasis' : 'Home';
+    const nextParams = !returning ? { first: true } : undefined;
+    try {
+      const profile = await loadProfile();
+      if (!launch.fromNotification) {
+        if (!profile) navigation.replace('ProfileSetup', { nextRoute, nextParams });
+        else navigation.replace(nextRoute, nextParams);
+      }
+    } catch { started.current = false; setLeaving(false); }
   }
 
   return <View style={styles.root}>
     <StatusBar barStyle="light-content" />
     <LinearGradient colors={['#082B2A', '#103C36', '#071F20']} style={StyleSheet.absoluteFill} />
-    <Animated.View pointerEvents="none" style={[styles.aura, { opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [.18, .35] }) }]} />
+    <Animated.View pointerEvents="none" style={[styles.aura, { opacity: glow.interpolate({ inputRange: [0, 1], outputRange: [.25, .5] }) }]}><Svg width="100%" height="100%" viewBox="0 0 360 360"><Defs><RadialGradient id="ambient"><Stop stopColor="#6B9472" stopOpacity=".5"/><Stop offset="1" stopColor="#6B9472" stopOpacity="0"/></RadialGradient></Defs><Circle cx="180" cy="180" r="180" fill="url(#ambient)"/></Svg></Animated.View>
     <ScrollView bounces={false} contentContainerStyle={[styles.page, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 20, minHeight: height }]}>
       <Animated.View style={[styles.content, { opacity: entrance, transform: [{ translateY: entrance.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }] }]}>
         <View style={styles.signature}><View style={styles.rule} /><Text style={styles.eyebrow}>نُورٌ يَنْمُو مَعَك</Text><View style={styles.rule} /></View>
         <View style={[styles.art, compact && styles.artCompact]}><LanternOasis /></View>
         <View style={styles.brand}>
           <Text accessibilityRole="header" style={[styles.title, compact && styles.titleCompact]}>سراج</Text>
-          <Text style={styles.english}>S I R A G</Text>
           <View style={styles.divider}><View style={styles.rule} /><Text style={styles.diamond}>✦</Text><View style={styles.rule} /></View>
           <Text style={styles.tagline}>كل عمل طيب يترك أثرًا</Text>
           <Text style={styles.description}>صلاتك، وردك، وعاداتك الطيبة؛{'\n'}خطوات صغيرة تُزهر بها واحتك.</Text>
@@ -119,7 +126,7 @@ export default function OasisSplash({ navigation }: any) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#082B2A' },
-  aura: { position: 'absolute', width: 360, height: 360, borderRadius: 180, backgroundColor: '#407D65', top: '15%', alignSelf: 'center' },
+  aura: { position: 'absolute', width: 360, height: 360, borderRadius: 180, top: '15%', alignSelf: 'center' },
   page: { flexGrow: 1, alignItems: 'center', paddingHorizontal: 28 },
   content: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', maxWidth: 420 },
   signature: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4 },
@@ -128,9 +135,8 @@ const styles = StyleSheet.create({
   art: { width: '100%', maxWidth: 340, height: 350 },
   artCompact: { height: 240, maxWidth: 250 },
   brand: { alignItems: 'center', marginTop: -8 },
-  title: { fontFamily: 'PlexBold', fontSize: 76, lineHeight: 108, color: '#F4D99F', textAlign: 'center', paddingHorizontal: 12 },
-  titleCompact: { fontSize: 62, lineHeight: 88 },
-  english: { fontSize: 11, color: '#D7BE8C', fontWeight: '500', marginTop: -8 },
+  title: { fontFamily: 'Ruqaa', fontSize: 96, lineHeight: 130, color: '#F4D99F', textAlign: 'center', paddingHorizontal: 12 },
+  titleCompact: { fontSize: 78, lineHeight: 108 },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 17 },
   diamond: { color: GOLD, fontSize: 12 },
   tagline: { fontFamily: 'PlexSemi', color: '#F7EDDA', fontSize: 20, textAlign: 'center', lineHeight: 34 },

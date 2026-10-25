@@ -1,31 +1,58 @@
-import React, {useEffect,useState,useCallback} from 'react';
-import {View,Text,Pressable,StyleSheet,ScrollView,StatusBar,ImageBackground,Image,Alert,TextInput} from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {NavigationContainer,DefaultTheme,createNavigationContainerRef} from '@react-navigation/native';
-import {createNativeStackNavigator} from '@react-navigation/native-stack';
-import {SafeAreaProvider,SafeAreaView} from 'react-native-safe-area-context';
-import {LanguageProvider} from './contexts/LanguageContext';
-import {ThemeProvider} from './contexts/ThemeContext';
-import {PrayerProvider} from './prayer/PrayerContext';
+import React from 'react';
+import { Text, View } from 'react-native';
+import { NavigationContainer, DefaultTheme, createNavigationContainerRef } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
+import { LanguageProvider } from './contexts/LanguageContext';
+import { ThemeProvider } from './contexts/ThemeContext';
+import { PrayerProvider } from './prayer/PrayerContext';
+import { useNotificationRouter } from './notifications/NotificationRouter';
+import PrayerRemindersScreen from './notifications/PrayerRemindersScreen';
+import ProfileSetupScreen from './profile/ProfileSetupScreen';
+import InsightsScreen from './reports/InsightsScreen';
+import SiragHome from './screens/SiragHome';
 import SandWorldScreen from './screens/SandWorldScreen';
-import HabitSetupScreen from './habits/HabitLibraryScreen';
+import HabitLibraryScreen from './habits/HabitLibraryScreen';
 import AthkarScreen from './athkar/AthkarScreen';
 import HifzScreen from './quran/hifz/HifzScreen';
-import {useNotificationRouter} from './notifications/NotificationRouter';
 import QuranReaderScreen from './screens/QuranReaderScreen';
-import {HabitPlan,PLANS_KEY,LOG_KEY,localDay} from './habits/habitData';
-import {useHomePrayerTimes} from './prayer/useHomePrayerTimes';
 import PrayerTrackerScreen from './screens/PrayerTrackerScreen';
 import OasisScreen from './oasis/OasisScreen';
 import OasisSplash from './oasis/OasisSplash';
-import SiragHome from './screens/SiragHome';
-import {useFonts} from 'expo-font';
-const Stack=createNativeStackNavigator();
-const navRef=createNavigationContainerRef<any>();
-function Router(){useNotificationRouter(navRef);return null;}
-const TEAL='#073943',GOLD='#f5bf66',PAPER='#fff8e9';
-const prayers=[['الفجر','☾'],['الظهر','☀'],['العصر','☀'],['المغرب','◕'],['العشاء','☾']];
-const habits=[{id:'fajr',label:'صلاة الفجر',hint:'سجّل صلاتك',icon:'◈',screen:'PrayerTracker'}, {id:'quran',label:'قراءة القرآن',hint:'وردك اليومي',icon:'📖'}, {id:'adhkar',label:'أذكار الصباح',hint:'اذكر الله',icon:'☀'}, {id:'tasbeeh',label:'التسبيح',hint:'تسبيح اليوم',icon:'◉'}];
-function Insights({navigation}:any){const [history,setHistory]=useState<{day:string,count:number}[]>([]);const [listenSeconds,setListenSeconds]=useState(0);useEffect(()=>{let active=true;(async()=>{const days=[];for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const key=d.toLocaleDateString('en-CA');try{const raw=await AsyncStorage.getItem(`sirag-home-habits-${key}`);const value=raw?JSON.parse(raw):[];days.push({day:key,count:Array.isArray(value)?value.length:0})}catch{days.push({day:key,count:0})}}if(active){setHistory(days);const values=await Promise.all(days.map(d=>AsyncStorage.getItem('sirag-quran-listen-seconds-'+d.day).catch(()=>null)));setListenSeconds(values.reduce((n,v)=>n+(Number(v)||0),0))}})();return()=>{active=false}},[]);const total=history.reduce((n,x)=>n+x.count,0);return <SafeAreaView style={styles.insightsRoot} edges={['top','bottom']}><StatusBar barStyle="dark-content"/><View style={styles.insightsHeader}><Pressable onPress={()=>navigation.goBack()}><Text style={styles.insightsBack}>→</Text></Pressable><Text style={styles.insightsTitle}>إحصائياتي</Text></View><ScrollView contentContainerStyle={{padding:20,gap:16}}><View style={styles.insightsPanel}><Text style={styles.insightsHeading}>ملخص الأسبوع</Text><Text style={styles.insightsNumber}>{total}</Text><Text style={styles.insightsNote}>نشاطًا مسجلًا في مهام الصفحة الرئيسية خلال آخر ٧ أيام</Text></View><View style={styles.insightsPanel}><Text style={styles.insightsHeading}>النشاط اليومي</Text><View style={styles.insightsBars}>{history.map((d,i)=><View key={d.day} style={styles.insightsBarCol}><Text style={styles.insightsBarCount}>{d.count}</Text><View style={[styles.insightsBar,{height:Math.max(6,d.count*26)}]}/><Text style={styles.insightsBarDay}>{i+1}</Text></View>)}</View></View><View style={styles.insightsPanel}><Text style={styles.insightsHeading}>الاستماع للقرآن خلال ٧ أيام</Text><Text style={styles.insightsNumber}>{Math.floor(listenSeconds/60)} دقيقة</Text><Text style={styles.insightsNote}>يُحتسب وقت التشغيل الفعلي داخل مشغل القرآن، دون فترات الإيقاف المؤقت.</Text></View><Text style={styles.insightsNote}>هذه الإحصاءات تخص المهام المسجلة في الصفحة الرئيسية فقط. لا تقيس قيمة العبادة ولا تشمل بعد جميع سجلات الصلاة والواحة.</Text></ScrollView></SafeAreaView>}
-export default function SiragApp(){const [fontsReady]=useFonts({Plex:require('../assets/fonts/IBMPlexSansArabic-Regular.ttf'),PlexMedium:require('../assets/fonts/IBMPlexSansArabic-Medium.ttf'),PlexSemi:require('../assets/fonts/IBMPlexSansArabic-SemiBold.ttf'),PlexBold:require('../assets/fonts/IBMPlexSansArabic-Bold.ttf'),AmiriQuran:require('../assets/fonts/AmiriQuran-Regular.ttf')});if(!fontsReady)return <View style={{flex:1,backgroundColor:'#1d2357'}}/>;return <SafeAreaProvider><LanguageProvider><ThemeProvider><PrayerProvider><NavigationContainer ref={navRef} theme={DefaultTheme}><Router/><Stack.Navigator initialRouteName="Splash" screenOptions={{headerShown:false}}><Stack.Screen name="Splash" component={OasisSplash}/><Stack.Screen name="Home" component={SiragHome}/><Stack.Screen name="HabitSetup" component={HabitSetupScreen}/><Stack.Screen name="QuranReader" component={QuranReaderScreen}/><Stack.Screen name="SandWorld" component={SandWorldScreen}/><Stack.Screen name="Oasis" component={OasisScreen} options={{animation:'fade'}}/><Stack.Screen name="PrayerTracker" component={PrayerTrackerScreen}/><Stack.Screen name="Insights" component={Insights}/><Stack.Screen name="Adhkar" component={AthkarScreen}/><Stack.Screen name="Hifz" component={HifzScreen}/></Stack.Navigator></NavigationContainer></PrayerProvider></ThemeProvider></LanguageProvider></SafeAreaProvider>}
-const styles=StyleSheet.create({splashOnlyCTA:{flex:1,justifyContent:'flex-end',paddingBottom:32},splashGradientTop:{position:'absolute',top:0,left:0,right:0,height:'48%',backgroundColor:'rgba(0,28,36,0.55)'},splashGradientBottom:{position:'absolute',bottom:0,left:0,right:0,height:'23%',backgroundColor:'rgba(0,23,27,0.30)'},splashIdentity:{alignItems:'center',marginTop:55,paddingHorizontal:14},splashEmblem:{width:106,height:105,borderTopLeftRadius:60,borderTopRightRadius:60,borderWidth:2,borderBottomWidth:0,borderColor:'#ffdb92',justifyContent:'center',alignItems:'center',backgroundColor:'rgba(0,35,43,0.22)'},splashEmblemMark:{fontSize:48,color:'#ffe0a1'},splashArabic:{fontSize:76,fontWeight:'800',color:'#ffe2a0',marginTop:-18,textShadowColor:'#0d2828',textShadowRadius:14},splashEnglish:{fontSize:25,letterSpacing:2,color:'#ffe5af'},splashTagline:{fontSize:18,fontWeight:'700',color:'#fff1cf',marginTop:14,textAlign:'center',textShadowColor:'#132c29',textShadowRadius:8},splashCTA:{backgroundColor:'#f6c570',borderRadius:30,minHeight:56,justifyContent:'center',marginHorizontal:36,marginBottom:32,borderWidth:1,borderColor:'#ffdf9a'},splashCTAText:{textAlign:'center',fontSize:19,fontWeight:'800',color:'#073943'},splashShade:{...StyleSheet.absoluteFill,backgroundColor:'rgba(0,25,30,0.28)'},insightsRoot:{flex:1,backgroundColor:'#f6f0e5'},insightsHeader:{flexDirection:'row',justifyContent:'space-between',alignItems:'center',padding:20},insightsTitle:{fontSize:24,fontWeight:'800',color:TEAL},insightsBack:{fontSize:28,color:TEAL},insightsPanel:{backgroundColor:PAPER,borderRadius:18,padding:22,borderWidth:1,borderColor:'#e4d9c5'},insightsHeading:{fontSize:19,fontWeight:'800',color:TEAL,textAlign:'right'},insightsNumber:{fontSize:55,fontWeight:'800',color:'#12806c',textAlign:'center',marginTop:10},insightsNote:{fontSize:13,lineHeight:23,color:'#77796f',textAlign:'right'},insightsBars:{height:160,flexDirection:'row',alignItems:'flex-end',justifyContent:'space-around',marginTop:20},insightsBarCol:{alignItems:'center',justifyContent:'flex-end',gap:6},insightsBar:{width:22,backgroundColor:'#0c8a78',borderRadius:5},insightsBarCount:{fontSize:12,color:TEAL},insightsBarDay:{fontSize:12,color:'#8a897b'},full:{flex:1,backgroundColor:'#062f40'},splashSafe:{flex:1,justifyContent:'space-between',paddingHorizontal:26,paddingTop:55,paddingBottom:48},brand:{alignItems:'center',marginTop:24,backgroundColor:'rgba(0,37,43,0.22)',borderRadius:26,paddingVertical:16},arch:{width:136,height:125,borderWidth:3,borderColor:'#ffdb8b',borderTopLeftRadius:70,borderTopRightRadius:70,borderBottomWidth:0,alignItems:'center',justifyContent:'center',backgroundColor:'rgba(0,40,49,.23)'},archGlyph:{fontSize:42,color:'#ffdb8b'},brandArabic:{fontSize:73,color:'#ffe0a0',fontWeight:'800',textShadowColor:'#38270a',textShadowRadius:18,marginTop:-13},brandEnglish:{fontSize:27,color:'#ffdb94',letterSpacing:2},tagline:{fontSize:18,fontWeight:'700',color:'#fff2ce',marginTop:16,textShadowColor:'#182b26',textShadowRadius:8},startButton:{backgroundColor:GOLD,paddingVertical:15,borderRadius:28,marginHorizontal:34,borderColor:'#ffe0a0',borderWidth:1,elevation:4},startText:{fontSize:20,fontWeight:'800',color:'#093c40',textAlign:'center'},homeRoot:{flex:1,backgroundColor:'#f6f0e5'},header:{backgroundColor:TEAL,paddingHorizontal:19,paddingTop:10,paddingBottom:12},headerRow:{flexDirection:'row',alignItems:'center',gap:14},headerAction:{height:38,width:38,borderRadius:20,backgroundColor:'rgba(255,255,255,.1)',alignItems:'center',justifyContent:'center'},headerActionText:{color:GOLD,fontSize:23},hello:{fontSize:12,color:'#d3e3d8'},name:{fontSize:22,fontWeight:'800',color:'white'},headerCaption:{color:'#f3d4a0',textAlign:'right',fontSize:12,marginTop:3},heroImage:{height:194,justifyContent:'flex-end'},heroOverlay:{padding:14,backgroundColor:'rgba(0,39,44,.68)',gap:3},heroTitle:{color:'#fff2d2',fontSize:19,fontWeight:'800',textAlign:'right'},heroSubtitle:{color:'#e9dfc7',fontSize:12,textAlign:'right'},heroLink:{alignSelf:'flex-start',backgroundColor:GOLD,paddingVertical:7,paddingHorizontal:13,borderRadius:15,marginTop:3},heroLinkText:{color:TEAL,fontSize:12,fontWeight:'800'},prayerCard:{marginHorizontal:12,marginTop:12,backgroundColor:PAPER,borderRadius:17,padding:12,borderWidth:1,borderColor:'#e4d9c5'},rowTitle:{flexDirection:'row',justifyContent:'space-between',alignItems:'center'},smallMuted:{fontSize:10,color:'#8a897b'},sectionTitle:{fontSize:17,fontWeight:'800',color:TEAL},prayerRow:{flexDirection:'row-reverse',marginTop:10,gap:3},prayerItem:{flex:1,alignItems:'center',paddingVertical:8,backgroundColor:'#f3ecdc',borderRadius:10,gap:4},prayerIcon:{color:'#c18a34',fontSize:18},prayerLabel:{color:TEAL,fontSize:10,fontWeight:'700'},prayerClock:{color:'#8b8c83',fontSize:10},dailyCard:{marginHorizontal:12,marginTop:12,backgroundColor:PAPER,borderRadius:18,padding:14,borderColor:'#e5d8c0',borderWidth:1},dailySub:{textAlign:'right',fontSize:11,color:'#8e8a79',marginBottom:7},habitRow:{flexDirection:'row',alignItems:'center',borderBottomWidth:1,borderBottomColor:'#e8ddca',paddingVertical:10,gap:11},checkbox:{width:24,height:24,borderWidth:1.5,borderColor:'#b2aa97',borderRadius:13,justifyContent:'center',alignItems:'center'},checkboxDone:{backgroundColor:'#0b7568',borderColor:'#0b7568'},checkText:{color:'white',fontWeight:'800'},habitCenter:{flex:1,alignItems:'flex-end'},habitTitle:{fontSize:14,fontWeight:'700',color:TEAL},habitHint:{fontSize:10,color:'#8e8c81',marginTop:2},habitIcon:{width:35,height:35,backgroundColor:'#e5e7d9',borderRadius:11,alignItems:'center',justifyContent:'center'},habitIconText:{fontSize:20,color:'#b88b35'},desertButton:{backgroundColor:TEAL,marginTop:13,paddingVertical:13,borderRadius:12},desertButtonText:{color:'#fff1d4',textAlign:'center',fontWeight:'700'},oasisCard:{margin:12},oasisImage:{height:170,justifyContent:'flex-end'},oasisCaption:{backgroundColor:'rgba(0,38,40,.72)',padding:12,borderBottomLeftRadius:17,borderBottomRightRadius:17},oasisTitle:{fontSize:17,color:'#fff3d6',fontWeight:'800',textAlign:'right'},oasisSub:{fontSize:11,color:'#eee2c8',textAlign:'right'},bottomBar:{position:'absolute',bottom:0,left:0,right:0,backgroundColor:PAPER,flexDirection:'row-reverse',justifyContent:'space-around',borderTopWidth:1,borderTopColor:'#e0d4bb',paddingTop:9,paddingBottom:8},tab:{alignItems:'center',gap:3},tabIcon:{fontSize:23,color:TEAL},tabLabel:{fontSize:10,color:TEAL,fontWeight:'700'}});
+
+const Stack = createNativeStackNavigator();
+const navRef = createNavigationContainerRef<any>();
+const theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: '#082B2A' } };
+function NotificationRouter() { useNotificationRouter(navRef); return null; }
+
+export default function SiragApp() {
+  const [fontsReady, fontError] = useFonts({
+    Ruqaa: require('../assets/fonts/ArefRuqaa-Bold.ttf'),
+    Plex: require('../assets/fonts/IBMPlexSansArabic-Regular.ttf'),
+    PlexMedium: require('../assets/fonts/IBMPlexSansArabic-Medium.ttf'),
+    PlexSemi: require('../assets/fonts/IBMPlexSansArabic-SemiBold.ttf'),
+    PlexBold: require('../assets/fonts/IBMPlexSansArabic-Bold.ttf'),
+    AmiriQuran: require('../assets/fonts/AmiriQuran-Regular.ttf'),
+  });
+  if (!fontsReady) return <View style={{ flex: 1, backgroundColor: '#082B2A', justifyContent: 'center', alignItems: 'center' }}>{fontError && <Text style={{ color: '#F1D39B', padding: 24, textAlign: 'center' }}>تعذّر تحميل الخطوط. أعد فتح التطبيق.</Text>}</View>;
+  return <SafeAreaProvider><LanguageProvider><ThemeProvider><PrayerProvider>
+    <NavigationContainer ref={navRef} theme={theme}>
+      <NotificationRouter />
+      <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Splash" component={OasisSplash} />
+        <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} options={{ presentation: 'transparentModal', animation: 'fade', gestureEnabled: false }} />
+        <Stack.Screen name="Home" component={SiragHome} />
+        <Stack.Screen name="HabitSetup" component={HabitLibraryScreen} />
+        <Stack.Screen name="PrayerReminders" component={PrayerRemindersScreen} />
+        <Stack.Screen name="QuranReader" component={QuranReaderScreen} />
+        <Stack.Screen name="SandWorld" component={SandWorldScreen} />
+        <Stack.Screen name="Oasis" component={OasisScreen} options={{ animation: 'fade' }} />
+        <Stack.Screen name="PrayerTracker" component={PrayerTrackerScreen} />
+        <Stack.Screen name="Insights" component={InsightsScreen} />
+        <Stack.Screen name="Adhkar" component={AthkarScreen} />
+        <Stack.Screen name="Hifz" component={HifzScreen} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  </PrayerProvider></ThemeProvider></LanguageProvider></SafeAreaProvider>;
+}

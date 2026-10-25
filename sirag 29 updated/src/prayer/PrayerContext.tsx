@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   CoarseLocation,
@@ -33,6 +33,12 @@ import {
   scheduleRollingWeekPrayerNotifications,
   requestNotificationPermission,
 } from './prayerNotificationService';
+import { AppState } from 'react-native';
+import { localDay } from '../habits/habitData';
+import { logKind } from '../habits/habitLog';
+import { updateJSON } from '../storage/jsonStore';
+import { COUNTED_PRAYERS, prayerCount } from '../tracking/activityModel';
+import { syncNotificationsSoon } from '../notifications/scheduler';
 import { heroRepository } from '../hero/storage/AsyncStorageHeroRepository';
 
 const CHECKIN_RECORDS_KEY = 'batl-prayer-checkin-records-v1';
@@ -78,20 +84,16 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   const [isLocationGranted, setIsLocationGranted] = useState<boolean>(false);
   const [now, setNow] = useState<Date>(new Date());
 
-  const todayStr = useMemo(() => {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  }, []);
+  const todayStr = localDay(now);
+  const checkinBusy = useRef(false);
 
   // Update clock every minute for accurate active windows
   useEffect(() => {
     const timer = setInterval(() => {
       setNow(new Date());
     }, 60000);
-    return () => clearInterval(timer);
+    const listener = AppState.addEventListener('change', state => { if (state === 'active') setNow(new Date()); });
+    return () => { clearInterval(timer); listener.remove(); };
   }, []);
 
   // Load saved preferences on launch
@@ -137,30 +139,30 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (notificationConfig) scheduleRollingWeekPrayerNotifications(rollingWeek, notificationConfig);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location, method, madhab, notificationConfig]);
+  }, [location, method, madhab, notificationConfig, todayStr]);
 
   const changeCity = useCallback(
     async (city: PredefinedCity) => {
-      setLocation(city);
-      setMethod(city.defaultMethod);
       await saveLocation(city);
       await saveCalculationMethod(city.defaultMethod);
+      setLocation(city);
+      setMethod(city.defaultMethod);
     },
     []
   );
 
   const changeMethod = useCallback(
     async (newMethod: CalculationMethodName) => {
-      setMethod(newMethod);
       await saveCalculationMethod(newMethod);
+      setMethod(newMethod);
     },
     []
   );
 
   const changeMadhab = useCallback(
     async (newMadhab: MadhabName) => {
-      setMadhab(newMadhab);
       await saveMadhab(newMadhab);
+      setMadhab(newMadhab);
     },
     []
   );
@@ -175,10 +177,10 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
 
   const updateNotifications = useCallback(
     async (cfg: Partial<PrayerNotificationConfig>) => {
-      if (!notificationConfig) return;
-      const updated = { ...notificationConfig, ...cfg };
-      setNotificationConfig(updated);
+      const base = notificationConfig || await getNotificationConfig();
+      const updated = { ...base, ...cfg };
       await saveNotificationConfig(updated);
+      setNotificationConfig(updated);
     },
     [notificationConfig]
   );
@@ -187,8 +189,8 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     const granted = await requestNotificationPermission();
     if (notificationConfig) {
       const updated = { ...notificationConfig, notificationsEnabled: granted };
-      setNotificationConfig(updated);
       await saveNotificationConfig(updated);
+      setNotificationConfig(updated);
     }
     return granted;
   }, [notificationConfig]);
@@ -204,8 +206,9 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
     } else {
       next = [...restDays, todayStr];
     }
-    setRestDays(next);
     await AsyncStorage.setItem(REST_DAYS_KEY, JSON.stringify(next));
+    setRestDays(next);
+    syncNotificationsSoon();
   }, [isRestDayToday, restDays, todayStr]);
 
   const submitPrayerCheckin = useCallback(
@@ -216,45 +219,35 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       dateString = todayStr,
       place?: CheckinPlace
     ) => {
-      const key = `${prayer}_${dateString}`;
-      const isJamaa = mode === 'jamaa';
-
-      // 1. Emit event to Hero Engine
-      const accepted = await heroRepository.recordEvent({
-        id: `evt-prayer-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`,
-        uid: 'guest-device-stable',
-        type: 'prayer_checkin',
-        source: 'prayer_checkin_sheet',
-        value: 1,
-        meta: {
-          prayer,
-          status,
-          jamaa: isJamaa,
-          place: isJamaa ? place : undefined,
-          dateStr: dateString,
-        },
-        at: new Date().toISOString(),
-      });
-
-      // 2. Save local checkin record
-      const record: PrayerCheckinRecord = {
-        prayer,
-        dateStr: dateString,
-        status,
-        mode,
-        place: isJamaa ? place : undefined,
-        checkedInAt: new Date().toISOString(),
-        pointsAwarded: status === 'on_time' ? (isJamaa ? 15 : 10) : status === 'late' ? (isJamaa ? 8 : 5) : 3,
-        xpAwarded: status === 'on_time' ? (isJamaa ? 25 : 15) : status === 'late' ? (isJamaa ? 12 : 8) : 5,
-      };
-
-      const nextCheckins = { ...checkins, [key]: record };
-      setCheckins(nextCheckins);
-      await AsyncStorage.setItem(CHECKIN_RECORDS_KEY, JSON.stringify(nextCheckins));
-
-      return accepted;
+      if (checkinBusy.current) throw new Error('انتظر اكتمال الحفظ');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateString) || localDay(new Date(dateString + 'T12:00:00')) !== dateString || dateString > localDay()) throw new Error('Invalid check-in date');
+      if (dateString === localDay() && COUNTED_PRAYERS.has(status) && new Date() < todayTimes[prayer]) throw new Error('لم يدخل وقت الصلاة بعد');
+      checkinBusy.current = true;
+      try {
+        const key = `${prayer}_${dateString}`;
+        const counted = COUNTED_PRAYERS.has(status);
+        const isJamaa = mode === 'jamaa';
+        const record: PrayerCheckinRecord = {
+          prayer, dateStr: dateString, status, mode, ...(isJamaa && place ? { place } : {}),
+          checkedInAt: new Date().toISOString(),
+          pointsAwarded: !counted ? 0 : status === 'on_time' ? (isJamaa ? 15 : 10) : status === 'late' ? (isJamaa ? 8 : 5) : 3,
+          xpAwarded: !counted ? 0 : status === 'on_time' ? (isJamaa ? 25 : 15) : status === 'late' ? (isJamaa ? 12 : 8) : 5,
+        };
+        const saved = await updateJSON<Record<string, PrayerCheckinRecord>>(CHECKIN_RECORDS_KEY, {}, previous => ({ ...previous, [key]: record }));
+        setCheckins(saved);
+        await logKind(['prayers','prayer'], prayerCount(saved, dateString), 'set', dateString);
+        await logKind(['fajr'], prayerCount(saved, dateString, true), 'set', dateString);
+        syncNotificationsSoon();
+        // Reward engine keeps its own per-prayer/day idempotency; reports use the canonical saved record.
+        if (counted) await heroRepository.recordEvent({
+          id: `evt-prayer-${dateString}-${prayer}`, uid: 'guest-device-stable', type: 'prayer_checkin',
+          source: 'prayer_checkin_sheet', value: 1,
+          meta: { prayer, status, jamaa: isJamaa, ...(place ? { place } : {}), dateStr: dateString }, at: record.checkedInAt,
+        });
+        return true;
+      } finally { checkinBusy.current = false; }
     },
-    [checkins, todayStr]
+    [todayStr, todayTimes]
   );
 
   const activePrayerForCheckin = useMemo(() => {

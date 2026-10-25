@@ -19,7 +19,11 @@
       }
     },
     "android": {
-      "package": "com.sirag.livingdesert"
+      "package": "com.sirag.livingdesert",
+      "permissions": [
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.SCHEDULE_EXACT_ALARM"
+      ]
     },
     "plugins": [
       "expo-font",

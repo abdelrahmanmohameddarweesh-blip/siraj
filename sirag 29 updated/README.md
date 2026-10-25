@@ -1,13 +1,23 @@
-# بطل مسلم (Batl Muslim) 🏆
+# سراج — النسخة المحدّثة
 
 تطبيق إسلامي تفاعلي تعليمي وتنافسي موجه للأسرة والأطفال والناشئة، يجمع بين متعة التنافس المعرفي والارتقاء في حفظ القرآن الكريم، الأحاديث الشريفة، والسيرة النبوية.
+
+## تشغيل هذه النسخة
+
+كل الخطوط والصور والأصوات مرفقة. افتح Terminal داخل **sirag 29 updated**، وشغّل `npm ci` ثم `npx expo start --clear`، ثم امسح رمز QR باستخدام Expo Go المتوافق مع SDK 58.
+
+- [خطوات الاختبار](TESTING-EXPO-GO.md)
+- [تفعيل قاعدة البيانات واختبار صوت الأذان](FIREBASE-AND-NOTIFICATIONS.md)
+- [صور الواجهات](docs/SCREENSHOTS.md)
+
+تظهر نافذة الاسم والجنس بعد شاشة البداية. البيانات محفوظة على الجهاز وتُزامَن مع Firebase عند تفعيل Anonymous Authentication ونشر قواعد الملف الشخصي. تنبيهات الأذان المخصصة في الخلفية تحتاج نسخة أصلية مثبتة؛ لا يكفي Expo Go لاختبار صوتها.
 
 ---
 
 ## 🚀 التقنيات المستخدمة (Tech Stack)
 
-- **Framework**: Expo SDK 57 (Managed Workflow)
-- **Runtime**: React Native 0.86 / React 19
+- **Framework**: Expo SDK 58 (Managed Workflow)
+- **Runtime**: React Native 0.88 / React 19.3
 - **Language**: TypeScript (Strict Mode)
 - **Audio Engine**: `expo-audio` with safe audio wrapper (`src/utils/safeAudio.ts`)
 - **Camera & AR**: `expo-camera` (Finish Ayah AR Filter)
@@ -55,13 +65,13 @@
 ## ⚙️ التثبيت والتشغيل المحلي (Quick Start)
 
 ### 1. المتطلبات (Prerequisites)
-- Node.js 18+ (أو استخدام المسار المحلي `export PATH="$HOME/.local/node/bin:$PATH"`)
+- Node.js 24 LTS (أو استخدام المسار المحلي `export PATH="$HOME/.local/node/bin:$PATH"`)
 - Expo CLI
 
 ### 2. تثبيت الحزم (Install)
 ```bash
 export PATH="$HOME/.local/node/bin:$PATH"
-npm install
+npm ci
 ```
 
 ### 3. متغيرات البيئة (Environment Variables)

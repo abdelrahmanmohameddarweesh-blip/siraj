@@ -7,6 +7,9 @@ import {useFocusEffect} from '@react-navigation/native';
 import {LOG_KEY,PLANS_KEY,localDay,HabitPlan} from '../habits/habitData';
 import {surahsList} from '../data/surahs';
 import {syncNotificationsSoon} from '../notifications/scheduler';
+import {useListeningTracker} from '../tracking/useListeningTracker';
+import {updateJSON} from '../storage/jsonStore';
+import {logKind} from '../habits/habitLog';
 
 import {splitBasmala} from '../quran/quranText';
 const BASMALA='بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ';
@@ -39,26 +42,34 @@ export default function QuranMushafScreen({navigation,initialPage}:any){
  const [readingMode,setReadingMode]=useState<'mushaf'|'accessible'>('mushaf');
  const player=useAudioPlayer(null);
  const audioStatus=useAudioPlayerStatus(player);
+ const listening=useListeningTracker(audioStatus,String(audioAyah || ''));
+ const seek=(position:number)=>{listening.beforeSeek();player.seekTo(position)};
  const [audioBusy,setAudioBusy]=useState(false);
  const day=localDay();
- const save=useCallback(async(next:QuranState)=>{setState(next);try{await AsyncStorage.setItem(STATE_KEY,JSON.stringify(next))}catch{}},[]);
+ const save=useCallback(async(next:QuranState)=>{try{const saved=await updateJSON<QuranState>(STATE_KEY,DEFAULT,previous=>({...previous,page:next.page,bookmarks:next.bookmarks}));setState(saved)}catch{Alert.alert('تعذّر الحفظ','لم نتمكن من حفظ موضع القراءة أو العلامة. تحقق من مساحة الجهاز.')}},[]);
  useEffect(()=>{AsyncStorage.getItem(STATE_KEY).then(raw=>{if(!raw)return;const saved=JSON.parse(raw) as QuranState;if(saved.page>=1&&saved.page<=TOTAL_PAGES){setState(prev=>({...DEFAULT,...saved,page:prev.page>1?prev.page:(initialPage||saved.page)}));if(!initialPage)setPage(saved.page)}}).catch(()=>{});},[]);
  useEffect(()=>{setSurahs(surahsList.map(x=>({number:x.number,name:'سورة '+x.name,englishName:x.english,startPage:SURAH_START_PAGES[x.number-1]||1})))},[]);
  useEffect(()=>{let live=true;setBusy(true);setError('');setAyahs([]);setSelected(null);
  (async()=>{try{const key=CACHE_PREFIX+page;let payload=await AsyncStorage.getItem(key);let items:Ayah[]|null=payload?JSON.parse(payload):null;
  if(!items){const response=await fetch(`${API}/page/${page}/quran-uthmani`);if(!response.ok)throw Error('network');const result=await response.json();items=result?.data?.ayahs;if(!Array.isArray(items)||!items.length)throw Error('empty');await AsyncStorage.setItem(key,JSON.stringify(items)).catch(()=>{});}
- if(live){setAyahs(items!);setState(prev=>{const next={...prev,page};AsyncStorage.setItem(STATE_KEY,JSON.stringify(next)).catch(()=>{});return next});}
+ if(live){setAyahs(items!);const saved=await updateJSON<QuranState>(STATE_KEY,DEFAULT,previous=>({...previous,page}));if(live)setState(saved);}
  }catch{if(live)setError('تعذّر تحميل الصفحة. اتصل بالإنترنت ثم أعد المحاولة. الصفحات التي فتحتها سابقًا متاحة دون اتصال.')}finally{if(live)setBusy(false)}})();
  return()=>{live=false};},[page,reloadTick]);
  const move=(next:number)=>{if(next<1||next>TOTAL_PAGES)return;player.pause();continueAudio.current=false;pendingPageStart.current=false;setAudioAyah(null);setPage(next);save({...state,page:next})};
  const bookmark=(number:number)=>save({...state,bookmarks:state.bookmarks.includes(number)?state.bookmarks.filter(n=>n!==number):[...state.bookmarks,number]});
  const readPages=state.readDays[day]||[];
- const markRead=async()=>{if(readPages.includes(page))return;const next={...state,readDays:{...state.readDays,[day]:[...readPages,page]}};await save(next);
- // Only Quran reading plans with page-based units receive automatic progress.
- try{const raw=await AsyncStorage.getItem(PLANS_KEY);const plans:HabitPlan[]=raw?JSON.parse(raw):[];const relevant=plans.filter(p=>/قرآن|مصحف|تلاوة/.test(p.title)&&/صفحة|صفحات|page/i.test(p.unit));if(relevant.length){const logRaw=await AsyncStorage.getItem(LOG_KEY);const logs=logRaw?JSON.parse(logRaw):{};const today={...(logs[day]||{})};for(const plan of relevant)today[plan.id]=Math.max(Number(today[plan.id]||0),next.readDays[day].length);await AsyncStorage.setItem(LOG_KEY,JSON.stringify({...logs,[day]:today}));syncNotificationsSoon();}}
- catch{Alert.alert('تنبيه','تم حفظ الصفحة المقروءة، لكن تعذّر تحديث متتبع العادة.')}
+ const marking=useRef(false);
+ const markRead=async()=>{
+  if(marking.current||busy||error||!ayahs.length)return;
+  marking.current=true;
+  try{
+   const date=localDay();
+   const next=await updateJSON<QuranState>(STATE_KEY,DEFAULT,previous=>({...previous,page,readDays:{...previous.readDays,[date]:[...new Set([...(previous.readDays[date]||[]),page])]}}));
+   setState(next);
+   await logKind(['quran_read','quran'],next.readDays[date].length,'max',date);
+  }catch{Alert.alert('تعذّر الحفظ','لم نتمكن من حفظ تقدم القراءة. حاول مرة أخرى.')}finally{marking.current=false}
  };
- const play=async(a:Ayah)=>{try{setAudioBusy(true);setAudioError('');if(audioAyah===a.number){if(audioStatus.playing){player.pause();continueAudio.current=false}else{if(audioStatus.duration>0&&audioStatus.currentTime>=audioStatus.duration-0.3)player.seekTo(0);player.play();continueAudio.current=true}return}continueAudio.current=true;player.pause();player.replace({uri:audioUrl(a)});player.play();setAudioAyah(a.number)}catch{setAudioError('تعذّر تشغيل التلاوة. تأكد من الاتصال بالإنترنت.')}finally{setAudioBusy(false)}};
+ const play=async(a:Ayah)=>{try{setAudioBusy(true);setAudioError('');if(audioAyah===a.number){if(audioStatus.playing){player.pause();continueAudio.current=false}else{if(audioStatus.duration>0&&audioStatus.currentTime>=audioStatus.duration-0.3)seek(0);player.play();continueAudio.current=true}return}continueAudio.current=true;listening.beforeSeek();player.pause();player.replace({uri:audioUrl(a)});player.play();setAudioAyah(a.number)}catch{setAudioError('تعذّر تشغيل التلاوة. تأكد من الاتصال بالإنترنت.')}finally{setAudioBusy(false)}};
  const currentAudioIndex=ayahs.findIndex(a=>a.number===audioAyah);
  const pendingPageStart=useRef(false);
  useEffect(()=>{if(!audioStatus.didJustFinish||!continueAudio.current)return;

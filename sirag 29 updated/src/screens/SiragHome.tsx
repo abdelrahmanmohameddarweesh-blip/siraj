@@ -10,6 +10,8 @@ import OasisHero, { OasisSummary } from '../oasis/OasisHero';
 import { useFocusEffect } from '@react-navigation/native';
 import { nudgeLabel, oasisWaiting } from '../oasis/oasisStatus';
 import { effectiveTarget } from '../habits/library';
+import { loadProfile } from '../profile/profileStore';
+import { reconcileHabitProgress } from '../tracking/reconcileHabits';
 import { hasPermission, requestPermissionAndSync, syncNotificationsSoon } from '../notifications/scheduler';
 
 const C = { ink: '#0f3a33', ink2: '#2b4a43', muted: '#7d7766', gold: '#c9973f', goldSoft: '#f1c76a', paper: '#f4ecdc', card: '#fffaf0', line: '#e6dac2', night: '#0f2a24' };
@@ -61,11 +63,14 @@ export default function SiragHome({ navigation }: any) {
   const [now, setNow] = useState(Date.now());
   const [nudge, setNudge] = useState<string | null>(null);
   const [notifOk, setNotifOk] = useState(true);
+  const [displayName, setDisplayName] = useState('');
   useFocusEffect(useCallback(() => { hasPermission().then(setNotifOk); }, []));
   useFocusEffect(useCallback(() => { let alive = true; oasisWaiting().then(w => { if (alive) setNudge(nudgeLabel(w)); }).catch(() => {}); return () => { alive = false; }; }, []));
 
   const load = useCallback(async () => {
     try {
+      await reconcileHabitProgress();
+      const profile = await loadProfile(); setDisplayName(profile?.name || '');
       const [p, l] = await Promise.all([AsyncStorage.getItem(PLANS_KEY), AsyncStorage.getItem(LOG_KEY)]);
       setPlans(p ? JSON.parse(p) : []); setLogs(l ? JSON.parse(l) : {});
     } catch { /* keep previous */ }
@@ -99,7 +104,7 @@ export default function SiragHome({ navigation }: any) {
           <LinearGradient pointerEvents="none" colors={['rgba(244,236,220,0)', 'rgba(244,236,220,.0)', C.paper]} locations={[0, 0.55, 1]} style={s.heroBottom} />
           <View pointerEvents="box-none" style={[s.heroHead, { paddingTop: insets.top + 14 }]}>
             <View style={{ flex: 1 }}>
-              <Text style={s.salam}>السلام عليكم</Text>
+              <Text style={s.salam}>السلام عليكم{displayName ? `، ${displayName}` : ''}</Text>
               <Text style={s.greet}>{greeting}</Text>
             </View>
             <Pressable accessibilityRole="button" accessibilityLabel="ادخل واحتك" onPress={openOasis} style={s.glassBtn}><Icon name="palm" color="#fff" /></Pressable>
@@ -182,7 +187,7 @@ export default function SiragHome({ navigation }: any) {
             const tgt = effectiveTarget(p, day);
             const pct = Math.min(100, Math.round((value / tgt) * 100));
             const done = value >= tgt;
-            const open = p.kind === 'adhkar_morning' ? () => navigation.navigate('Adhkar', { session: 'morning' }) : p.kind === 'adhkar_evening' ? () => navigation.navigate('Adhkar', { session: 'evening' }) : (p.kind === 'hifz' || p.kind === 'hifz_review') ? () => navigation.navigate('Hifz') : null;
+            const open = (p.kind === 'prayers' || p.id === 'prayer' || p.id === 'fajr') ? () => navigation.navigate('PrayerTracker') : (p.kind === 'quran_read' || p.id === 'quran' || p.id === 'quran_listen') ? () => navigation.navigate('QuranReader') : (p.kind === 'adhkar_morning' || p.id === 'morning_adhkar') ? () => navigation.navigate('Adhkar', { session: 'morning' }) : (p.kind === 'adhkar_evening' || p.id === 'evening_adhkar') ? () => navigation.navigate('Adhkar', { session: 'evening' }) : (p.kind === 'hifz' || p.kind === 'hifz_review' || p.id === 'quran_memorize' || p.id === 'quran_review') ? () => navigation.navigate('Hifz') : null;
             return (
               <View key={p.id} style={s.habit}>
                 <View style={s.rowBetween}>
@@ -217,8 +222,9 @@ export default function SiragHome({ navigation }: any) {
             ['sun', adhkarSession === 'morning' ? 'أذكار الصباح' : 'أذكار المساء', 'من حصن المسلم', 'Adhkar', { session: adhkarSession }],
             ['brain', 'حفظ القرآن', 'ورد واختبار ومراجعة', 'Hifz', undefined],
             ['arch', 'صلواتي', 'سجّل صلاتك', 'PrayerTracker', undefined],
-            ['chart', 'إحصائياتي', 'أسبوعك بالأرقام', 'Insights', undefined],
+            ['chart', 'إحصائياتي', 'تفاصيل رحلتك وتقاريرك', 'Insights', undefined],
             ['palm', 'واحتي', 'ازرع واسقِ', 'Oasis', undefined],
+            ['sun', 'تنبيهات الصلاة', 'قبل الأذان وبعد الصلاة', 'PrayerReminders', undefined],
           ] as const).map(([icon, title, sub, to, params]) => (
             <Pressable key={to} onPress={() => navigation.navigate(to, params)} style={s.tile}>
               <View style={s.tileIcon}><Icon name={icon} color={C.ink} /></View>

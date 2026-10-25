@@ -14,15 +14,16 @@ export const DEFAULT_FOLLOW_UP: Record<PrayerId, number> = { fajr: 35, dhuhr: 30
 export type DayTimes = { dateStr: string; fajr: Date; sunrise: Date; dhuhr: Date; asr: Date; maghrib: Date; isha: Date };
 export type PrayerSettings = {
   enabled: boolean;
-  perPrayer: Record<PrayerId, { enabled: boolean; sound: boolean }>;
+  perPrayer: Record<PrayerId, { enabled: boolean; sound: boolean; athanEnabled?: boolean }>;
   followUp: boolean;
   followUpMin: Record<PrayerId, number>;
+  preAlertByPrayer?: Partial<Record<PrayerId, number>>;
   preAlertMin: number; // 0 = off
   quietStart: string; quietEnd: string; quietEnabled: boolean; // applies to habit reminders only
 };
 export type Planned = {
   id: string; at: Date; title: string; body: string;
-  channel: 'athan' | 'checkin' | 'habits';
+  channel: 'athan' | 'checkin' | 'habits' | 'silent';
   sound: 'athan' | 'default' | null;
   data: Record<string, string>;
 };
@@ -63,17 +64,18 @@ const copyFor = (p: HabitPlan, t: number) => (HABIT_COPY[p.kind || ''] || ((pl: 
 
 export function buildSchedule(input: PlanInput): Planned[] {
   const out: Planned[] = [];
-  const s = input.prayer, nowMs = input.now.getTime() + 5000;
+  const s = input.prayer, nowMs = input.now.getTime();
   for (const day of input.days) {
     const rest = input.restDays.includes(day.dateStr);
     if (s.enabled && !rest) {
       for (const p of PRAYER_IDS) {
         const cfg = s.perPrayer[p]; if (!cfg?.enabled) continue;
         const at = day[p];
-        if (s.preAlertMin > 0) out.push({ id: `pre:${day.dateStr}:${p}`, at: mins(at, -s.preAlertMin), title: `${PRAYER_AR[p]} بعد ${s.preAlertMin.toLocaleString('ar-EG')} دقائق`, body: 'وقت مناسب للوضوء والاستعداد.', channel: 'checkin', sound: 'default', data: { type: 'prayer_pre', prayer: p, date: day.dateStr } });
-        out.push({ id: `athan:${day.dateStr}:${p}`, at, title: `حان الآن وقت صلاة ${PRAYER_AR[p]} 🕌`, body: 'حيّ على الصلاة، حيّ على الفلاح.', channel: 'athan', sound: cfg.sound ? 'athan' : 'default', data: { type: 'prayer_athan', prayer: p, date: day.dateStr } });
+        const pre = s.preAlertByPrayer?.[p] ?? s.preAlertMin;
+        if (Number.isFinite(pre) && pre > 0 && pre <= 60) out.push({ id: `pre:${day.dateStr}:${p}`, at: mins(at, -pre), title: `${PRAYER_AR[p]} بعد ${pre.toLocaleString('ar-EG')} دقائق`, body: 'وقت مناسب للوضوء والاستعداد.', channel: 'checkin', sound: 'default', data: { type: 'prayer_pre', prayer: p, date: day.dateStr } });
+        if (cfg.athanEnabled !== false) out.push({ id: `athan:${day.dateStr}:${p}`, at, title: `حان الآن وقت صلاة ${PRAYER_AR[p]} 🕌`, body: 'حيّ على الصلاة، حيّ على الفلاح.', channel: cfg.sound ? 'athan' : 'silent', sound: cfg.sound ? 'athan' : null, data: { type: 'prayer_athan', prayer: p, date: day.dateStr } });
         const done = COUNTED.has(String(input.checkins[`${p}_${day.dateStr}`]?.status));
-        if (s.followUp && !done) out.push({ id: `pfu:${day.dateStr}:${p}`, at: mins(at, s.followUpMin[p] ?? DEFAULT_FOLLOW_UP[p]), title: `هل صليت ${PRAYER_AR[p]}؟`, body: 'اضغط لتسجيل صلاتك.', channel: 'checkin', sound: 'default', data: { type: 'prayer_checkin', prayer: p, date: day.dateStr } });
+        if (s.followUp && !done && s.followUpMin[p] > 0 && s.followUpMin[p] <= 180) out.push({ id: `pfu:${day.dateStr}:${p}`, at: mins(at, s.followUpMin[p] ?? DEFAULT_FOLLOW_UP[p]), title: `هل صليت ${PRAYER_AR[p]}؟`, body: 'اضغط لتسجيل صلاتك.', channel: 'checkin', sound: 'default', data: { type: 'prayer_checkin', prayer: p, date: day.dateStr } });
       }
     }
     for (const plan of input.plans) {
@@ -107,7 +109,7 @@ export function routeFor(data: Record<string, any> | undefined): { screen: strin
     if (data.kind === 'adhkar_morning') return { screen: 'Adhkar', params: { session: 'morning' } };
     if (data.kind === 'adhkar_evening') return { screen: 'Adhkar', params: { session: 'evening' } };
     if (data.kind === 'hifz' || data.kind === 'hifz_review') return { screen: 'Hifz' };
-    if (data.kind === 'quran_read') return { screen: 'QuranReader' };
+    if (data.kind === 'quran_read' || data.planId === 'quran_listen') return { screen: 'QuranReader' };
   }
   return { screen: 'Home' };
 }

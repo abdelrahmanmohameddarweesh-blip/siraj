@@ -10,9 +10,21 @@ service cloud.firestore {
     // User profiles & private state
     // Users can only read and write their own documents
     match /users/{userId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null && request.auth.uid == userId;
       allow create, update: if request.auth != null && request.auth.uid == userId;
       allow delete: if false; // prevent accidental account wipe via client SDK
+    }
+
+    // Personal onboarding data: private to its authenticated owner.
+    match /privateProfiles/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['displayName', 'gender', 'createdAt', 'profileUpdatedAt', 'updatedAt'])
+        && request.resource.data.displayName is string
+        && request.resource.data.displayName.size() >= 2
+        && request.resource.data.displayName.size() <= 50
+        && request.resource.data.gender in ['male', 'female'];
+      allow delete: if false;
     }
 
     // Public / Global Leaderboards

@@ -8,6 +8,7 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { ATHKAR, Dhikr } from './athkarData';
 import { ATHKAR_LOG_KEY, AthkarLog, Session, completeItem, emptySession, progress, sessionFor, streak, tap } from './athkarEngine';
 import { usePrayer } from '../prayer/PrayerContext';
+import { updateJSON } from '../storage/jsonStore';
 import { localDay } from '../habits/habitData';
 import { logKind } from '../habits/habitLog';
 import { addDays } from '../quran/hifz/hifzEngine';
@@ -19,13 +20,15 @@ export default function AthkarScreen({ navigation, route }: any) {
   const [session, setSession] = useState<Session>(route?.params?.session || sessionFor(new Date(), todayTimes));
   const [log, setLog] = useState<AthkarLog>({});
   const [justDone, setJustDone] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const day = localDay();
   const logRef = useRef(log); logRef.current = log;
   const player = useAudioPlayer(null); const status = useAudioPlayerStatus(player);
   const [playing, setPlaying] = useState<number | null>(null);
 
-  useEffect(() => { AsyncStorage.getItem(ATHKAR_LOG_KEY).then(r => { if (r) setLog(JSON.parse(r)); }).catch(() => {}); }, []);
-  const persist = (next: AthkarLog) => { setLog(next); AsyncStorage.setItem(ATHKAR_LOG_KEY, JSON.stringify(next)).catch(() => {}); };
+  useEffect(() => { AsyncStorage.getItem(ATHKAR_LOG_KEY).then(r => { if (r) { const value = JSON.parse(r); logRef.current = value; setLog(value); } setLoaded(true); }).catch(() => setSaveError('تعذّر تحميل الأذكار. أعد فتح الشاشة قبل التسجيل.')); }, []);
+  const persist = (next: AthkarLog) => { logRef.current = next; setLog(next); void updateJSON<AthkarLog>(ATHKAR_LOG_KEY, {}, () => next).then(() => setSaveError('')).catch(() => setSaveError('تعذّر حفظ آخر تحديث. تحقق من مساحة الجهاز ثم أعد المحاولة.')); };
   const cur = log[day]?.[session] || emptySession();
 
   // time spent reading, counted only while this screen is open and the app is active
@@ -33,22 +36,25 @@ export default function AthkarScreen({ navigation, route }: any) {
     let active = AppState.currentState === 'active';
     const sub = AppState.addEventListener('change', s => { active = s === 'active'; });
     const t = setInterval(() => {
-      if (!active) return;
+      if (!active || !loaded) return;
       const L = logRef.current, s = L[day]?.[session] || emptySession();
       if (s.done) return;
       persist({ ...L, [day]: { ...(L[day] || {}), [session]: { ...s, seconds: s.seconds + 5 } } });
     }, 5000);
     return () => { clearInterval(t); sub.remove(); player.pause(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, day]));
+  }, [session, day, loaded]));
 
   const update = (fn: (s: typeof cur) => typeof cur) => {
-    const next = fn(cur);
-    persist({ ...log, [day]: { ...(log[day] || {}), [session]: next } });
-    if (next.done && !cur.done) {
+    if (!loaded) return;
+    const previous = logRef.current; const date = localDay();
+    const current = previous[date]?.[session] || emptySession();
+    const next = fn(current);
+    persist({ ...previous, [date]: { ...(previous[date] || {}), [session]: next } });
+    if (next.done && !current.done) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
       setJustDone(true);
-      logKind([session === 'morning' ? 'adhkar_morning' : 'adhkar_evening'], 1);
+      void logKind([session === 'morning' ? 'adhkar_morning' : 'adhkar_evening', session === 'morning' ? 'morning_adhkar' : 'evening_adhkar'], 1).catch(() => setSaveError('حُفظت الجلسة، لكن تعذّر تحديث العادة.'));
     } else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
   };
   const onTap = (d: Dhikr) => update(s => tap(s, d, ATHKAR, new Date().toISOString()));
@@ -71,6 +77,7 @@ export default function AthkarScreen({ navigation, route }: any) {
         <Text style={s.title}>{title}</Text>
         <View style={{ width: 40 }} />
       </View>
+      {!!saveError && <Text accessibilityRole="alert" style={{ color: C.bad, padding: 12, textAlign: 'right', fontFamily: F.r }}>{saveError}</Text>}
       <View style={s.seg}>
         {(['morning', 'evening'] as Session[]).map(x => (
           <Pressable key={x} onPress={() => { setSession(x); setJustDone(false); }} style={[s.segItem, session === x && s.segOn]}>

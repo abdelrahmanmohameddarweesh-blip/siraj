@@ -35,11 +35,11 @@ export interface PrayerTimesDay {
 
 export interface PrayerNotificationConfig {
   notificationsEnabled: boolean;
-  fajr: { enabled: boolean; offsetMinutes: number; sound: boolean };
-  dhuhr: { enabled: boolean; offsetMinutes: number; sound: boolean };
-  asr: { enabled: boolean; offsetMinutes: number; sound: boolean };
-  maghrib: { enabled: boolean; offsetMinutes: number; sound: boolean };
-  isha: { enabled: boolean; offsetMinutes: number; sound: boolean };
+  fajr: { enabled: boolean; offsetMinutes: number; sound: boolean; athanEnabled?: boolean };
+  dhuhr: { enabled: boolean; offsetMinutes: number; sound: boolean; athanEnabled?: boolean };
+  asr: { enabled: boolean; offsetMinutes: number; sound: boolean; athanEnabled?: boolean };
+  maghrib: { enabled: boolean; offsetMinutes: number; sound: boolean; athanEnabled?: boolean };
+  isha: { enabled: boolean; offsetMinutes: number; sound: boolean; athanEnabled?: boolean };
   checkinReminderMinutes: number; // Minutes after prayer time (default 30)
   checkinFollowUpEnabled: boolean; // Max 1 follow-up reminder
   quietHoursEnabled: boolean;
@@ -49,6 +49,7 @@ export interface PrayerNotificationConfig {
   followUpMin?: Partial<Record<'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha', number>>;
   /** heads-up before the adhan, 0 = off */
   preAlertMin?: number;
+  preAlertByPrayer?: Partial<Record<'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha', number>>;
 }
 
 export type CheckinStatus = 'on_time' | 'late' | 'qada' | 'rest' | 'none';

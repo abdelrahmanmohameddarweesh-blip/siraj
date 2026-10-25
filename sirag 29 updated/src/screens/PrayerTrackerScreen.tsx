@@ -70,6 +70,7 @@ export default function PrayerTrackerScreen({ navigation, route }: any) {
   >('dhuhr');
 
   const todayStr = todayTimes.dateStr;
+  const [checkinDate, setCheckinDate] = useState<string | undefined>();
 
   // Next prayer
   const nextPrayerKey = windowInfo.nextPrayer;
@@ -81,10 +82,11 @@ export default function PrayerTrackerScreen({ navigation, route }: any) {
   // Completed count for today
   const prayerKeys = ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'] as const;
   const completedCount = prayerKeys.reduce((acc, k) => {
-    return acc + (checkins[`${k}_${todayStr}`] ? 1 : 0);
+    return acc + (['on_time','late','qada'].includes(checkins[`${k}_${todayStr}`]?.status) ? 1 : 0);
   }, 0);
 
   const handleOpenCheckin = (prayerId: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha') => {
+    setCheckinDate(undefined);
     setSelectedPrayerForCheckin(prayerId);
     setCheckinModalVisible(true);
   };
@@ -92,7 +94,7 @@ export default function PrayerTrackerScreen({ navigation, route }: any) {
   // opened from «هل صليت الظهر؟»: go straight to that prayer's check-in
   React.useEffect(() => {
     const p = route?.params?.checkin;
-    if (p && ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'].includes(p)) handleOpenCheckin(p);
+    if (p && ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'].includes(p)) { handleOpenCheckin(p); setCheckinDate(route?.params?.date); navigation.setParams({ checkin: undefined, date: undefined }); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route?.params?.checkin]);
 
@@ -271,7 +273,7 @@ export default function PrayerTrackerScreen({ navigation, route }: any) {
               : '--:--';
 
             const checkinRecord = checkins[`${prayerKey}_${todayStr}`];
-            const isChecked = !!checkinRecord;
+            const isChecked = !!checkinRecord && ['on_time','late','qada'].includes(checkinRecord.status);
             const isNext = nextPrayerKey === prayerKey;
             const isActive = windowInfo.activePrayer === prayerKey;
             const notifEnabled = notificationConfig?.[prayerKey]?.enabled ?? true;
@@ -543,6 +545,7 @@ export default function PrayerTrackerScreen({ navigation, route }: any) {
             {/* Tab 3: Notifications */}
             {activeSettingsTab === 'notifications' && (
               <ScrollView style={{ flex: 1 }}>
+                <TouchableOpacity style={styles.notifToggleRow} onPress={() => { setSettingsVisible(false); navigation.navigate('PrayerReminders'); }}><Text style={{color:colors.textPrimary,fontFamily:'PlexBold'}}>تخصيص التذكير قبل الأذان وبعد الصلاة ←</Text></TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.notifToggleRow, { borderColor: colors.border }]}
                   onPress={async () => {
@@ -574,7 +577,7 @@ export default function PrayerTrackerScreen({ navigation, route }: any) {
                       {language === 'ar' ? 'ساعات الهدوء 🌙' : 'Quiet Hours 🌙'}
                     </Text>
                     <Text style={[styles.methodSubtitle, { color: colors.textSecondary }]}>
-                      {language === 'ar' ? 'كتم تنبيهات التفقد أثناء ساعات النوم' : 'Silence check-in prompts during sleep'}
+                      {language === 'ar' ? 'كتم تذكيرات العادات أثناء ساعات النوم' : 'Silence habit reminders during sleep'}
                     </Text>
                   </View>
                   <Text style={{ fontSize: 18 }}>
@@ -608,7 +611,7 @@ export default function PrayerTrackerScreen({ navigation, route }: any) {
       </Modal>
 
       {/* Prayer Check-in Bottom Sheet Modal */}
-      <PrayerCheckinSheet
+      <PrayerCheckinSheet date={checkinDate}
         visible={checkinModalVisible}
         prayer={selectedPrayerForCheckin}
         onClose={() => setCheckinModalVisible(false)}

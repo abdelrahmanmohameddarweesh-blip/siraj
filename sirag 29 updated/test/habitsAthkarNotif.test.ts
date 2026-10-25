@@ -56,7 +56,8 @@ test('Notifications: adhan with its sound, then «هل صليت؟» after the co
   const athan = plan.filter(n => n.id.startsWith('athan:'));
   assert.strictEqual(athan.length, 5);
   assert.strictEqual(athan.find(n => n.data.prayer === 'fajr')!.sound, 'athan', 'fajr adhan is not silenced by quiet hours');
-  assert.strictEqual(athan.find(n => n.data.prayer === 'asr')!.sound, 'default');
+  assert.strictEqual(athan.find(n => n.data.prayer === 'asr')!.sound, null);
+  assert.strictEqual(athan.find(n => n.data.prayer === 'asr')!.channel, 'silent', 'disabled sound uses a silent Android channel');
   const fu = plan.filter(n => n.id.startsWith('pfu:'));
   assert.deepStrictEqual(fu.map(n => n.data.prayer), ['fajr', 'asr', 'maghrib', 'isha'], 'no question for a prayer already recorded');
   assert.strictEqual(fu.find(n => n.data.prayer === 'maghrib')!.at.getTime(), T(17, 40).getTime());

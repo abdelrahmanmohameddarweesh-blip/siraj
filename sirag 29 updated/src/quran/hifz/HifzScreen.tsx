@@ -13,6 +13,7 @@ import {
   Answer, AyahText, HifzState, Order, PASS_SCORE, Question, buildNewTest, buildReview, completeToday, dueKeys, keyOf, newState,
   parseKey, reviewAnswer, score, startToday, todaysKeys, addDays,
 } from './hifzEngine';
+import { updateJSON } from '../../storage/jsonStore';
 import { C, F, ar } from '../../ui/theme';
 
 const KEY = 'sirag-hifz-v1';
@@ -35,8 +36,10 @@ export default function HifzScreen({ navigation }: any) {
   const player = useAudioPlayer(null); const status = useAudioPlayerStatus(player);
   const [playing, setPlaying] = useState<string | null>(null);
   const repeatLeft = useRef(0);
+  const answerLocked = useRef(false);
+  const submitting = useRef(false);
 
-  const save = (next: HifzState) => { setSt(next); AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => {}); };
+  const save = async (next: HifzState) => { await updateJSON<HifzState | null>(KEY, null, () => next); setSt(next); };
 
   useEffect(() => { (async () => {
     const plan = (await readPlans()).find(p => p.kind === 'hifz' || p.id === 'quran_memorize');
@@ -69,28 +72,32 @@ export default function HifzScreen({ navigation }: any) {
     const r = parseKey(k); repeatLeft.current = times; player.replace({ uri: ayahAudio(r.s, r.a) }); player.play(); setPlaying(k);
   };
 
-  const begin = (start: { s: number; a: number }, order: Order) => { const s0 = newState({ start, order, perDay }); save(s0); setMode('home'); };
+  const begin = async (start: { s: number; a: number }, order: Order) => { try { const s0 = newState({ start, order, perDay }); await save(s0); setMode('home'); } catch { setError('تعذّر حفظ خطة الحفظ. حاول مرة أخرى.'); } };
 
-  const startQuiz = (kind: 'new' | 'review') => {
+  const startQuiz = async (kind: 'new' | 'review') => {
     if (!st) return;
     const list = (kind === 'new' ? keys : due.slice(0, 20)).map(k => texts[k]).filter(Boolean);
-    if (!list.length) return;
-    if (kind === 'new') save(startToday(st, day, keys));
+    if (!list.length || list.length !== (kind === 'new' ? keys : due.slice(0,20)).length) { setError('انتظر تحميل جميع آيات الاختبار قبل البدء.'); return; }
+    answerLocked.current = false;
+    try { if (kind === 'new') await save(startToday(st, day, keys)); } catch { setError('تعذّر بدء الاختبار وحفظه. حاول مرة أخرى.'); return; }
     const qs = kind === 'new' ? buildNewTest(list, pool, Date.now() % 100000) : buildReview(list, pool, Date.now() % 100000);
     setQuiz({ kind, qs, i: 0, answers: [], picked: null, revealed: false }); setMode('quiz');
   };
   const answer = (credit: number, picked?: number) => {
-    if (!quiz) return;
+    if (!quiz || quiz.picked !== null || answerLocked.current) return;
+    answerLocked.current = true;
     const q = quiz.qs[quiz.i];
     Haptics.impactAsync(credit >= 1 ? Haptics.ImpactFeedbackStyle.Light : Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
     setQuiz({ ...quiz, answers: [...quiz.answers, { key: q.key, credit }], picked: picked ?? -1 });
   };
   const next = async () => {
-    if (!quiz || !st) return;
-    if (quiz.i + 1 < quiz.qs.length) { setQuiz({ ...quiz, i: quiz.i + 1, picked: null, revealed: false }); return; }
+    if (!quiz || !st || quiz.picked === null || submitting.current) return;
+    if (quiz.i + 1 < quiz.qs.length) { answerLocked.current = false; setQuiz({ ...quiz, i: quiz.i + 1, picked: null, revealed: false }); return; }
+    submitting.current = true;
+    try {
     const sc = score(quiz.answers);
     if (quiz.kind === 'new') {
-      const r = completeToday(st, day, sc, lengths); save(r.state);
+      const r = completeToday(st, day, sc, lengths); await save(r.state);
       if (r.learned) await logKind(['hifz', 'quran_memorize'], r.learned);
       setResult({ kind: 'new', score: sc, passed: r.passed, learned: r.learned, count: quiz.qs.length });
       if (r.passed) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -98,11 +105,12 @@ export default function HifzScreen({ navigation }: any) {
       let s1 = st; const byKey: Record<string, number[]> = {};
       quiz.answers.forEach(a => { (byKey[a.key] = byKey[a.key] || []).push(a.credit); });
       Object.entries(byKey).forEach(([k, cs]) => { s1 = reviewAnswer(s1, k, cs.every(c => c >= 0.75), day); });
-      save(s1);
-      await logKind(['hifz_review', 'quran_review'], Object.keys(byKey).length, 'add');
+      await save(s1);
+      await logKind(['hifz_review', 'quran_review'], s1.reviewed?.[day] || 0, 'max', day);
       setResult({ kind: 'review', score: sc, passed: sc >= PASS_SCORE, learned: 0, count: Object.keys(byKey).length });
     }
     setQuiz(null); setMode('result');
+    } catch { setError('تعذّر حفظ نتيجة الاختبار. حاول مرة أخرى.'); } finally { submitting.current = false; }
   };
 
   const total = st ? Object.keys(st.items).length : 0;

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { localDay } from '../../habits/habitData';
 import { usePrayer } from '../../prayer/PrayerContext';
 import { syncNotificationsSoon } from '../../notifications/scheduler';
 import { CheckinMode, CheckinPlace, CheckinStatus, PrayerCheckinRecord } from '../../prayer/types';
@@ -16,8 +17,9 @@ export function describeCheckin(r: Pick<PrayerCheckinRecord, 'status' | 'mode' |
 
 type Step = 'prayed' | 'time' | 'mode' | 'place' | 'done';
 
-export function PrayerCheckinSheet({ visible, prayer, onClose, onSaved }: {
+export function PrayerCheckinSheet({ visible, prayer, onClose, onSaved, date }: {
   visible: boolean;
+  date?: string;
   prayer: PrayerId;
   onClose: () => void;
   /** called after the check-in is saved */
@@ -36,7 +38,7 @@ export function PrayerCheckinSheet({ visible, prayer, onClose, onSaved }: {
 
   const save = async (m: CheckinMode, pl?: CheckinPlace) => {
     setMode(m); setPlace(pl); setSaving(true); setFailed(false);
-    try { await submitPrayerCheckin(prayer, status, m, undefined, pl); setStep('done'); onSaved?.(); syncNotificationsSoon(); }
+    try { await submitPrayerCheckin(prayer, status, m, date, pl); setStep('done'); onSaved?.(); syncNotificationsSoon(); }
     catch { setFailed(true); }
     finally { setSaving(false); }
   };
@@ -56,16 +58,16 @@ export function PrayerCheckinSheet({ visible, prayer, onClose, onSaved }: {
         <View style={s.grip} />
         <View style={s.head}>
           {step !== 'prayed' && step !== 'done' ? <Pressable onPress={back} hitSlop={10}><Text style={s.backText}>رجوع</Text></Pressable> : <View />}
-          <Text style={s.badge}>🕌 صلاة {name}</Text>
+          <Text style={s.badge}>🕌 صلاة {name}{date ? ` · ${date}` : ''}</Text>
         </View>
 
         {step === 'prayed' && <>
           <Text style={s.title}>هل صليت {name}؟</Text>
           <Option primary label="نعم، الحمد لله" onPress={() => setStep('time')} />
           <Option label="ليس بعد" onPress={onClose} />
-          <Pressable onPress={async () => { await toggleRestDay(); onSaved?.(); onClose(); }} style={s.rest}>
+          {(!date || date === localDay()) && <Pressable onPress={async () => { await toggleRestDay(); onSaved?.(); onClose(); }} style={s.rest}>
             <Text style={s.restText}>{isRestDayToday ? 'إلغاء يوم الراحة' : 'يوم راحة: إيقاف متابعة الصلوات اليوم دون حرج'}</Text>
-          </Pressable>
+          </Pressable>}
         </>}
 
         {step === 'time' && <>
