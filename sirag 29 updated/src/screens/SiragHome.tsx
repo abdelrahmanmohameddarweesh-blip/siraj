@@ -1,324 +1,1234 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
-import { HabitPlan, LOG_KEY, PLANS_KEY, localDay } from '../habits/habitData';
-import { useHomePrayerTimes } from '../prayer/useHomePrayerTimes';
-import OasisHero, { OasisSummary } from '../oasis/OasisHero';
-import { useFocusEffect } from '@react-navigation/native';
-import { nudgeLabel, oasisWaiting } from '../oasis/oasisStatus';
-import { effectiveTarget } from '../habits/library';
-import { loadProfile } from '../profile/profileStore';
-import { reconcileHabitProgress } from '../tracking/reconcileHabits';
-import { hasPermission, requestPermissionAndSync, syncNotificationsSoon } from '../notifications/scheduler';
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Alert,
+  AppState,
+  ImageBackground,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
+import Svg, { Circle } from "react-native-svg";
+import { AppearancePreference, useTheme } from "../contexts/ThemeContext";
+import { homePalettes, HomePalette } from "../design/homeTheme";
+import { BottomDock, IconName, SirajIcon } from "../design/SirajUI";
+import { F, ar } from "../ui/theme";
+import { HabitPlan, LOG_KEY, localDay } from "../habits/habitData";
+import { effectiveTarget } from "../habits/library";
+import { loadProfile } from "../profile/profileStore";
+import { reconcileHabitProgress } from "../tracking/reconcileHabits";
+import { loadReportSources } from "../reports/reportStore";
+import { ReportSources } from "../reports/reportModel";
+import { useHomePrayerTimes } from "../prayer/useHomePrayerTimes";
+import { usePrayer } from "../prayer/PrayerContext";
+import {
+  calculatePrayerTimes,
+  getCurrentPrayerWindow,
+} from "../prayer/prayerTimesService";
+import { PRAYER_AR, PRAYER_IDS } from "../notifications/schedulePlan";
+import { syncNotificationsSoon } from "../notifications/scheduler";
+import { updateJSON } from "../storage/jsonStore";
+import type { CalculationMethodName } from "../prayer/types";
 
-const C = { ink: '#0f3a33', ink2: '#2b4a43', muted: '#7d7766', gold: '#c9973f', goldSoft: '#f1c76a', paper: '#f4ecdc', card: '#fffaf0', line: '#e6dac2', night: '#0f2a24' };
-const F = { r: 'Plex', m: 'PlexMedium', s: 'PlexSemi', b: 'PlexBold' };
-const PRAYERS: { key: 'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha'; name: string }[] = [
-  { key: 'fajr', name: 'الفجر' }, { key: 'dhuhr', name: 'الظهر' }, { key: 'asr', name: 'العصر' }, { key: 'maghrib', name: 'المغرب' }, { key: 'isha', name: 'العشاء' },
+const METHODS: [CalculationMethodName, string][] = [
+  ["Egyptian", "الهيئة المصرية"],
+  ["UmmAlQura", "أم القرى"],
+  ["MuslimWorldLeague", "رابطة العالم الإسلامي"],
+  ["NorthAmerica", "أمريكا الشمالية"],
+  ["Karachi", "كراتشي"],
+  ["Dubai", "دبي"],
+  ["Qatar", "قطر"],
+  ["Kuwait", "الكويت"],
 ];
-const METHODS = ['Egyptian', 'UmmAlQura', 'MuslimWorldLeague', 'NorthAmerica', 'Karachi', 'Dubai', 'Qatar', 'Kuwait'] as const;
-const ar = (n: number) => n.toLocaleString('ar-EG');
-const METHOD_AR: Record<string, string> = { Egyptian: 'الهيئة المصرية', UmmAlQura: 'أم القرى', MuslimWorldLeague: 'رابطة العالم الإسلامي', NorthAmerica: 'أمريكا الشمالية', Karachi: 'كراتشي', Dubai: 'دبي', Qatar: 'قطر', Kuwait: 'الكويت' };
-
-function Icon({ name, size = 22, color = C.ink }: { name: 'book' | 'arch' | 'chart' | 'plus' | 'pin' | 'palm' | 'home' | 'target' | 'sun' | 'brain'; size?: number; color?: string }) {
-  const p = { stroke: color, strokeWidth: 1.8, fill: 'none', strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      {name === 'book' && <><Path {...p} d="M4 5.5c2.5-1 5-1 8 1 3-2 5.5-2 8-1V19c-2.5-1-5-1-8 1-3-2-5.5-2-8-1z" /><Path {...p} d="M12 6.5V20" /></>}
-      {name === 'arch' && <><Path {...p} d="M5 21V11a7 7 0 0 1 14 0v10" /><Path {...p} d="M9 21v-6a3 3 0 0 1 6 0v6" /><Path {...p} d="M3 21h18" /></>}
-      {name === 'chart' && <><Path {...p} d="M4 20h16" /><Rect {...p} x="6" y="11" width="3" height="7" rx="1" /><Rect {...p} x="11" y="7" width="3" height="11" rx="1" /><Rect {...p} x="16" y="13" width="3" height="5" rx="1" /></>}
-      {name === 'plus' && <><Circle {...p} cx="12" cy="12" r="9" /><Path {...p} d="M12 8v8M8 12h8" /></>}
-      {name === 'pin' && <><Path {...p} d="M12 21s-6-5.5-6-11a6 6 0 0 1 12 0c0 5.5-6 11-6 11z" /><Circle {...p} cx="12" cy="10" r="2.2" /></>}
-      {name === 'palm' && <><Path {...p} d="M12 21V10" /><Path {...p} d="M12 10c-1-3-4-4-7-3 2 0 5 1 7 3zM12 10c1-3 4-4 7-3-2 0-5 1-7 3zM12 10c-2-2-2-5 0-7 2 2 2 5 0 7z" /><Path {...p} d="M5 21h14" /></>}
-      {name === 'home' && <><Path {...p} d="M4 11l8-7 8 7" /><Path {...p} d="M6 10v10h12V10" /></>}
-      {name === 'sun' && <><Circle {...p} cx="12" cy="12" r="4" /><Path {...p} d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4" /></>}
-      {name === 'brain' && <><Path {...p} d="M9 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 2 5 3 3 0 0 0 6 0V7a3 3 0 0 0-3-3z" /><Path {...p} d="M15 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-2 5 3 3 0 0 1-6 0" /></>}
-      {name === 'target' && <><Circle {...p} cx="12" cy="12" r="8.5" /><Circle {...p} cx="12" cy="12" r="4.5" /><Circle cx="12" cy="12" r="1.4" fill={color} /></>}
-    </Svg>
-  );
+// Artwork is decorative; every label, counter and control below is rendered by the app.
+const SCENES = {
+  dark: require("../../assets/design/home-night.png"),
+  light: require("../../assets/design/home-dawn.png"),
+};
+function habitDestination(
+  p: HabitPlan,
+): { screen: string; params?: object } | null {
+  if (p.kind === "prayers" || p.id === "prayer" || p.id === "fajr")
+    return { screen: "PrayerTracker" };
+  if (p.kind === "quran_read" || p.id === "quran" || p.id === "quran_listen")
+    return { screen: "QuranReader" };
+  if (p.kind === "adhkar_morning" || p.id === "morning_adhkar")
+    return { screen: "Adhkar", params: { session: "morning" } };
+  if (p.kind === "adhkar_evening" || p.id === "evening_adhkar")
+    return { screen: "Adhkar", params: { session: "evening" } };
+  if (
+    p.kind === "hifz" ||
+    p.kind === "hifz_review" ||
+    p.id === "quran_memorize" ||
+    p.id === "quran_review"
+  )
+    return { screen: "Hifz" };
+  return null;
 }
-
-function untilText(ms: number) {
-  const mins = Math.max(0, Math.round(ms / 60000));
-  if (mins < 1) return 'الآن';
-  if (mins < 60) return `بعد ${ar(mins)} ${mins <= 10 && mins >= 3 ? 'دقائق' : 'دقيقة'}`;
-  const h = Math.floor(mins / 60), m = mins % 60;
-  const hs = h === 1 ? 'ساعة' : h === 2 ? 'ساعتين' : `${ar(h)} ساعات`;
-  return m ? `بعد ${hs} و${ar(m)} د` : `بعد ${hs}`;
-}
-
 export default function SiragHome({ navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { theme, appearance, setAppearance } = useTheme();
+  const palette = homePalettes[theme];
+  const s = useMemo(() => styles(palette), [palette]);
+  const night = theme === "dark";
   const prayer = useHomePrayerTimes();
-  const day = localDay();
-  const [plans, setPlans] = useState<HabitPlan[]>([]);
-  const [logs, setLogs] = useState<Record<string, Record<string, number>>>({});
-  const [amount, setAmount] = useState<Record<string, string>>({});
-  const [cityPicker, setCityPicker] = useState(false);
-  const [methodPicker, setMethodPicker] = useState(false);
-  const [summary, setSummary] = useState<OasisSummary | null>(null);
+  const { checkins } = usePrayer();
   const [now, setNow] = useState(Date.now());
-  const [nudge, setNudge] = useState<string | null>(null);
-  const [notifOk, setNotifOk] = useState(true);
-  const [displayName, setDisplayName] = useState('');
-  useFocusEffect(useCallback(() => { hasPermission().then(setNotifOk); }, []));
-  useFocusEffect(useCallback(() => { let alive = true; oasisWaiting().then(w => { if (alive) setNudge(nudgeLabel(w)); }).catch(() => {}); return () => { alive = false; }; }, []));
-
+  const day = localDay(new Date(now));
+  const [sources, setSources] = useState<ReportSources | null>(null);
+  const [name, setName] = useState("");
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState("");
+  const [modal, setModal] = useState<"appearance" | "city" | "habit" | null>(
+    null,
+  );
+  const [busy, setBusy] = useState(false);
+  const [search, setSearch] = useState("");
+  const [selectedPlan, setSelectedPlan] = useState<HabitPlan | null>(null);
+  const [amount, setAmount] = useState("1");
+  const [entryMode, setEntryMode] = useState<"add" | "set">("add");
   const load = useCallback(async () => {
+    setRefreshing(true);
     try {
       await reconcileHabitProgress();
-      const profile = await loadProfile(); setDisplayName(profile?.name || '');
-      const [p, l] = await Promise.all([AsyncStorage.getItem(PLANS_KEY), AsyncStorage.getItem(LOG_KEY)]);
-      setPlans(p ? JSON.parse(p) : []); setLogs(l ? JSON.parse(l) : {});
-    } catch { /* keep previous */ }
+      const [data, profile] = await Promise.all([
+        loadReportSources([day]),
+        loadProfile(),
+      ]);
+      setSources(data);
+      setName(profile?.name || "");
+      setError("");
+    } catch {
+      setError("تعذّر تحديث السجل. اسحب لأسفل لإعادة المحاولة.");
+    } finally {
+      setRefreshing(false);
+    }
+  }, [day]);
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+      const sub = AppState.addEventListener("change", (state) => {
+        if (state === "active") {
+          setNow(Date.now());
+          void load();
+        }
+      });
+      return () => sub.remove();
+    }, [load]),
+  );
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(timer);
   }, []);
-  useEffect(() => { const unsub = navigation.addListener('focus', load); load(); return unsub; }, [navigation, load]);
-  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(t); }, []);
-
-  const log = async (id: string, increment: number) => {
-    const updated = { ...logs, [day]: { ...(logs[day] || {}), [id]: Math.max(0, (logs[day]?.[id] || 0) + increment) } };
-    setLogs(updated);
-    try { await AsyncStorage.setItem(LOG_KEY, JSON.stringify(updated)); syncNotificationsSoon(); } catch { Alert.alert('خطأ', 'لم نتمكن من حفظ تقدمك'); }
-  };
-
-  const fmt = (d?: Date) => (d ? d.toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit' }) : '--:--');
-  const next = useMemo(() => prayer.times ? PRAYERS.find(p => prayer.times![p.key].getTime() > now) : undefined, [prayer.times, now]);
-  const hour = new Date(now).getHours();
-  const greeting = hour < 12 ? 'صباح الخير' : 'مساء الخير';
-  const daily = plans.filter(p => p.frequency === 'daily');
-  const doneCount = daily.filter(p => (logs[day]?.[p.id] || 0) >= effectiveTarget(p, day)).length;
-  const adhkarSession = hour >= 4 && hour < 15 ? 'morning' : 'evening';
-  const openOasis = () => navigation.navigate('Oasis');
-
+  const plans = sources?.plans || [];
+  const daily = plans.filter(
+    (p) =>
+      p.frequency === "daily" || new Date(day + "T12:00:00").getDay() === 5,
+  );
+  const logs = sources?.logs[day] || {};
+  const done = daily.filter(
+    (p) => (logs[p.id] || 0) >= effectiveTarget(p, day),
+  ).length;
+  const window = getCurrentPrayerWindow(prayer.times, new Date(now));
+  const yesterdayIsha = useMemo(() => {
+    const d = new Date(day + "T12:00:00");
+    d.setDate(d.getDate() - 1);
+    return calculatePrayerTimes(
+      prayer.location,
+      d,
+      prayer.method,
+      prayer.madhab,
+    ).isha.getTime();
+  }, [day, prayer.location, prayer.method, prayer.madhab]);
+  const previousTime =
+    PRAYER_IDS.map((p) => prayer.times[p].getTime())
+      .filter((t) => t <= now)
+      .pop() ?? yesterdayIsha;
+  const elapsedFraction = Math.max(
+    0,
+    Math.min(
+      1,
+      (now - previousTime) / (window.nextPrayerTime.getTime() - previousTime),
+    ),
+  );
+  const ringLength = 2 * Math.PI * 34;
+  const minutes = Math.max(
+    0,
+    Math.ceil((window.nextPrayerTime.getTime() - now) / 60000),
+  );
+  const clock =
+    ar(Math.floor(minutes / 60)) + ":" + ar(minutes % 60).padStart(2, "٠");
+  const session = new Date(now) >= prayer.times.asr ? "evening" : "morning";
+  const dhikrDone = !!sources?.athkar[day]?.[session]?.done;
+  const pages = new Set(sources?.readDays[day] || []).size;
+  const fmt = (d: Date) =>
+    d.toLocaleTimeString("ar-EG", { hour: "numeric", minute: "2-digit" });
+  const open = (screen: string, params?: object) =>
+    navigation.navigate(screen, params);
+  async function changeAppearance(value: AppearancePreference) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await setAppearance(value);
+    } catch {
+      Alert.alert("تعذّر الحفظ", "حاول اختيار المظهر مرة أخرى.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function saveHabit() {
+    if (!selectedPlan || busy) return;
+    const increment = Number(
+      amount
+        .trim()
+        .replace(/[٠-٩]/g, (digit) => String(digit.charCodeAt(0) - 0x660))
+        .replace(/[۰-۹]/g, (digit) => String(digit.charCodeAt(0) - 0x6f0)),
+    );
+    if (
+      !amount.trim() ||
+      !Number.isInteger(increment) ||
+      increment < (entryMode === "add" ? 1 : 0) ||
+      increment > 10000
+    ) {
+      Alert.alert("العدد", "أدخل عددًا صحيحًا صالحًا حتى ١٠٠٠٠.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await updateJSON<Record<string, Record<string, number>>>(
+        LOG_KEY,
+        {},
+        (previous) => ({
+          ...previous,
+          [day]: {
+            ...(previous[day] || {}),
+            [selectedPlan.id]:
+              entryMode === "set"
+                ? increment
+                : (previous[day]?.[selectedPlan.id] || 0) + increment,
+          },
+        }),
+      );
+      syncNotificationsSoon();
+      setModal(null);
+      await load();
+    } catch {
+      Alert.alert("تعذّر الحفظ", "لم نتمكن من حفظ التقدم. حاول مرة أخرى.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  function openHabit(p: HabitPlan) {
+    const route = habitDestination(p);
+    if (route) open(route.screen, route.params);
+    else {
+      setSelectedPlan(p);
+      setEntryMode("add");
+      setAmount("1");
+      setModal("habit");
+    }
+  }
+  const date = new Date(now).toLocaleDateString("ar-EG", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
   return (
     <View style={s.root}>
-      <StatusBar barStyle="light-content" />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 + insets.bottom }}>
-        {/* living oasis hero */}
-        <View style={[s.hero, { height: 420 + insets.top }]}>
-          <OasisHero onOpen={openOasis} onSummary={setSummary} />
-          <LinearGradient pointerEvents="none" colors={['rgba(7,22,28,.78)', 'rgba(7,22,28,.25)', 'rgba(7,22,28,0)']} style={[s.heroTop, { height: 170 + insets.top }]} />
-          <LinearGradient pointerEvents="none" colors={['rgba(244,236,220,0)', 'rgba(244,236,220,.0)', C.paper]} locations={[0, 0.55, 1]} style={s.heroBottom} />
-          <View pointerEvents="box-none" style={[s.heroHead, { paddingTop: insets.top + 14 }]}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.salam}>السلام عليكم{displayName ? `، ${displayName}` : ''}</Text>
-              <Text style={s.greet}>{greeting}</Text>
-            </View>
-            <Pressable accessibilityRole="button" accessibilityLabel="ادخل واحتك" onPress={openOasis} style={s.glassBtn}><Icon name="palm" color="#fff" /></Pressable>
+      <StatusBar barStyle={night ? "light-content" : "dark-content"} />
+      <ScrollView
+        key={theme}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={load}
+            tintColor={palette.accent}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 112 + insets.bottom }}
+      >
+        <ImageBackground
+          source={SCENES[theme]}
+          style={[s.hero, { paddingTop: insets.top + 12 }]}
+          imageStyle={{ opacity: night ? 0.94 : 1 }}
+          resizeMode="cover"
+        >
+          <LinearGradient
+            pointerEvents="none"
+            colors={[
+              night ? "rgba(3,20,23,.2)" : "rgba(255,249,232,.35)",
+              palette.heroFade,
+              palette.background,
+            ]}
+            locations={[0, 0.65, 1]}
+            style={StyleSheet.absoluteFill}
+          />
+          <View style={s.topbar}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="تنبيهات الصلاة"
+              onPress={() => open("PrayerReminders")}
+              style={s.iconButton}
+            >
+              <SirajIcon name="bell" color={palette.accent} />
+            </Pressable>
+            <Text accessibilityRole="header" style={s.brand}>
+              سراج
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="المظهر والملف الشخصي"
+              onPress={() => setModal("appearance")}
+              style={s.iconButton}
+            >
+              <SirajIcon name="user" color={palette.text} />
+            </Pressable>
           </View>
-          <Pressable accessibilityRole="button" onPress={openOasis} style={s.oasisChip}>
-            <View style={{ flex: 1 }}>
-              <Text style={s.oasisName}>{summary?.name || 'واحتك'}</Text>
-              {nudge ? <Text style={s.nudge}>{nudge}</Text> : null}
-              <Text style={s.oasisMeta}>{summary ? `${ar(summary.grown)} من ${ar(summary.plots)} نبتة${summary.residents ? ` · ${ar(summary.residents)} من السكان` : ''}` : 'كل عمل طيب يترك أثرًا'}</Text>
+          <Text style={s.greeting} numberOfLines={1} ellipsizeMode="tail">
+            {name ? `مرحبًا ${name}` : "أهلًا بك في سراج"}
+          </Text>
+          <Text style={s.blessing}>ليكن في يومك نورٌ وأثر</Text>
+          <Text style={s.date}>{date}</Text>
+        </ImageBackground>
+        <View style={s.body}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="الصلاة القادمة، افتح متتبع الصلاة"
+            onPress={() => open("PrayerTracker")}
+            style={({ pressed }) => [
+              s.prayerCard,
+              pressed && { opacity: 0.88 },
+            ]}
+          >
+            <LinearGradient
+              colors={night ? ["#16443D", "#0C2D2C"] : ["#FFFCF5", "#ECE6D6"]}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={s.countdown}>
+              <Svg width={78} height={78} viewBox="0 0 78 78">
+                <Circle
+                  cx={39}
+                  cy={39}
+                  r={34}
+                  fill="none"
+                  stroke={palette.track}
+                  strokeWidth={3}
+                />
+                <Circle
+                  cx={39}
+                  cy={39}
+                  r={34}
+                  fill="none"
+                  stroke={palette.accent}
+                  strokeWidth={3}
+                  strokeDasharray={`${ringLength} ${ringLength}`}
+                  strokeDashoffset={ringLength * (1 - elapsedFraction)}
+                  rotation={-90}
+                  origin="39,39"
+                />
+              </Svg>
+              <View style={s.countdownText}>
+                <Text style={s.countdownValue}>{clock}</Text>
+                <Text style={s.countdownCaption}>متبقي</Text>
+              </View>
             </View>
-            <View style={s.enter}><Text style={s.enterText}>ادخل واحتك</Text>{nudge ? <View style={s.dot} /> : null}</View>
+            <View style={{ flex: 1, alignItems: "flex-end" }}>
+              <Text style={s.eyebrow}>الصلاة القادمة</Text>
+              <Text style={s.prayerName}>{PRAYER_AR[window.nextPrayer]}</Text>
+              <Text style={s.prayerTime}>{fmt(window.nextPrayerTime)}</Text>
+            </View>
+            <View style={s.mosque}>
+              <SirajIcon name="mosque" size={57} color={palette.accent} />
+            </View>
           </Pressable>
-        </View>
-
-        {/* next prayer */}
-        <LinearGradient colors={['#123f37', '#0d2c27']} style={s.prayerCard}>
-          <View style={s.rowBetween}>
-            <View>
-              <Text style={s.kicker}>الصلاة القادمة</Text>
-              <Text style={s.nextName}>{next ? next.name : 'الفجر'}</Text>
-            </View>
-            <View style={{ alignItems: 'flex-start' }}>
-              <Text style={s.nextTime}>{next ? fmt(prayer.times?.[next.key]) : fmt(prayer.times?.fajr)}</Text>
-              <Text style={s.until}>{next && prayer.times ? untilText(prayer.times[next.key].getTime() - now) : 'غدًا'}</Text>
-            </View>
-          </View>
-          <View style={s.prayerRow}>
-            {PRAYERS.map(p => {
-              const on = next?.key === p.key;
+          <View style={s.prayerStrip}>
+            {PRAYER_IDS.map((p, index) => {
+              const next = p === window.nextPrayer;
+              const recorded = ["on_time", "late", "qada"].includes(
+                checkins[`${p}_${day}`]?.status || "",
+              );
               return (
-                <Pressable key={p.key} onPress={() => navigation.navigate('PrayerTracker')} style={[s.pItem, on && s.pItemOn]}>
-                  <Text style={[s.pName, on && s.pOn]}>{p.name}</Text>
-                  <Text style={[s.pTime, on && s.pOn]}>{fmt(prayer.times?.[p.key])}</Text>
+                <Pressable
+                  key={p}
+                  accessibilityRole="button"
+                  accessibilityLabel={`صلاة ${PRAYER_AR[p]}`}
+                  onPress={() => open("PrayerTracker")}
+                  style={[
+                    s.prayerItem,
+                    next && { backgroundColor: palette.soft },
+                  ]}
+                >
+                  <SirajIcon
+                    name={recorded ? "check" : index === 4 ? "moon" : "sun"}
+                    size={21}
+                    color={next ? palette.accent : palette.secondary}
+                  />
+                  <Text
+                    style={[s.prayerLabel, next && { color: palette.text }]}
+                  >
+                    {PRAYER_AR[p]}
+                  </Text>
+                  <Text style={s.prayerSmall}>{fmt(prayer.times[p])}</Text>
                 </Pressable>
               );
             })}
           </View>
-          <View style={s.rowBetween}>
-            <Pressable onPress={() => { setCityPicker(!cityPicker); setMethodPicker(false); }} style={s.inline}><Icon name="pin" size={15} color={C.goldSoft} /><Text style={s.link}>{prayer.location?.cityNameAr || 'اختر مدينتك'}</Text></Pressable>
-            <Pressable onPress={async () => { const ok = await prayer.detect(); if (!ok) Alert.alert('الموقع', 'لم يتم السماح بالموقع. اختر مدينتك يدويًا.'); }} style={s.inline}><Icon name="target" size={15} color={C.goldSoft} /><Text style={s.link}>موقعي الحالي</Text></Pressable>
-            <Pressable onPress={() => { setMethodPicker(!methodPicker); setCityPicker(false); }}><Text style={s.link}>{METHOD_AR[prayer.method] || prayer.method}</Text></Pressable>
-          </View>
-          {cityPicker && (
-            <ScrollView style={s.picker} nestedScrollEnabled>
-              {prayer.cities.map(c => (
-                <Pressable key={c.id} onPress={async () => { await prayer.setCity(c.id); setCityPicker(false); }} style={s.pickRow}><Text style={s.pickText}>{c.cityNameAr} · {c.countryNameAr}</Text></Pressable>
-              ))}
-            </ScrollView>
-          )}
-          {methodPicker && (
-            <View style={s.picker}>
-              {METHODS.map(m => (
-                <Pressable key={m} onPress={async () => { await prayer.changeMethod(m); setMethodPicker(false); }} style={s.pickRow}><Text style={s.pickText}>{METHOD_AR[m] || m}</Text></Pressable>
-              ))}
-            </View>
-          )}
-        </LinearGradient>
-        <Text style={s.note}>الأوقات محسوبة وفق موقعك وطريقة الحساب المختارة. تحقق من مواقيت مسجدك المحلي عند الحاجة.</Text>
-
-        {!notifOk && (
-          <Pressable onPress={async () => setNotifOk(await requestPermissionAndSync())} style={s.notifCard}>
-            <Text style={s.notifTitle}>فعّل الأذان والتذكيرات 🔔</Text>
-            <Text style={s.notifSub}>الأذان في وقته، وسؤال بعد الجماعة: هل صليت؟ وتذكير بعاداتك في أوقاتها.</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="تغيير المدينة وطريقة حساب الصلاة"
+            onPress={() => {
+              setSearch("");
+              setModal("city");
+            }}
+            style={s.location}
+          >
+            <SirajIcon name="pin" size={13} color={palette.muted} />
+            <Text style={s.locationText}>
+              {prayer.location.cityNameAr} ·{" "}
+              {METHODS.find(([id]) => id === prayer.method)?.[1]}
+            </Text>
+            <Text style={s.locationText}>⌄</Text>
           </Pressable>
-        )}
-
-        {/* today's habits */}
-        <View style={s.section}>
-          <View style={s.rowBetween}>
-            <Text style={s.h2}>عاداتي اليوم</Text>
-            {daily.length > 0 && <Text style={s.count}>{ar(doneCount)} / {ar(daily.length)}</Text>}
-          </View>
-          {plans.length === 0 ? (
-            <Pressable onPress={() => navigation.navigate('HabitSetup', { first: false })} style={s.empty}>
-              <Icon name="plus" color={C.gold} />
-              <Text style={s.emptyText}>ابدأ باختيار عادة إسلامية تناسبك</Text>
-            </Pressable>
-          ) : plans.map(p => {
-            const value = logs[day]?.[p.id] || 0;
-            const tgt = effectiveTarget(p, day);
-            const pct = Math.min(100, Math.round((value / tgt) * 100));
-            const done = value >= tgt;
-            const open = (p.kind === 'prayers' || p.id === 'prayer' || p.id === 'fajr') ? () => navigation.navigate('PrayerTracker') : (p.kind === 'quran_read' || p.id === 'quran' || p.id === 'quran_listen') ? () => navigation.navigate('QuranReader') : (p.kind === 'adhkar_morning' || p.id === 'morning_adhkar') ? () => navigation.navigate('Adhkar', { session: 'morning' }) : (p.kind === 'adhkar_evening' || p.id === 'evening_adhkar') ? () => navigation.navigate('Adhkar', { session: 'evening' }) : (p.kind === 'hifz' || p.kind === 'hifz_review' || p.id === 'quran_memorize' || p.id === 'quran_review') ? () => navigation.navigate('Hifz') : null;
-            return (
-              <View key={p.id} style={s.habit}>
-                <View style={s.rowBetween}>
-                  <Text style={s.habitTitle}>{p.title}</Text>
-                  <Text style={[s.habitVal, done && { color: '#12816d' }]}>{done ? 'تم ✓' : `${ar(value)} / ${ar(tgt)} ${p.unit}`}</Text>
-                </View>
-                <View style={s.track}><View style={[s.fill, { width: `${pct}%` }]} /></View>
-                <View style={s.habitActions}>
-                  {/قرآن|مصحف|تلاوة/.test(p.title) && (
-                    <Pressable onPress={() => navigation.navigate('QuranReader')} style={s.ghost}><Text style={s.ghostText}>افتح المصحف</Text></Pressable>
-                  )}
-                  <View style={{ flex: 1 }} />
-                  {open ? <Pressable onPress={open} style={s.logBtn}><Text style={s.logText}>{done ? 'افتح' : 'ابدأ'}</Text></Pressable> : <>
-                  <Pressable onPress={() => log(p.id, -1)} style={s.stepBtn} accessibilityLabel="إنقاص"><Text style={s.stepText}>−</Text></Pressable>
-                  <TextInput style={s.input} placeholder="عدد" placeholderTextColor="#a99f8a" keyboardType="number-pad" value={amount[p.id] || ''} onChangeText={v => setAmount({ ...amount, [p.id]: v })} />
-                  <Pressable onPress={() => { const n = Number(amount[p.id] || 1); if (Number.isInteger(n) && n > 0 && n <= 10000) { log(p.id, n); setAmount({ ...amount, [p.id]: '' }); } else Alert.alert('العدد', 'أدخل عددًا صحيحًا'); }} style={s.logBtn}>
-                    <Text style={s.logText}>سجّل</Text>
-                  </Pressable></>}
-                </View>
-              </View>
-            );
-          })}
-          {plans.length > 0 && (
-            <Pressable onPress={() => navigation.navigate('HabitSetup', { first: false })} style={s.addRow}><Icon name="plus" size={18} color={C.gold} /><Text style={s.addText}>إضافة عادة</Text></Pressable>
+          {!!error && (
+            <Text accessibilityRole="alert" style={s.error}>
+              {error}
+            </Text>
           )}
-        </View>
-
-        {/* quick doors */}
-        <View style={s.grid}>
-          {([
-            ['book', 'القرآن الكريم', 'اقرأ واستمع', 'QuranReader', undefined],
-            ['sun', adhkarSession === 'morning' ? 'أذكار الصباح' : 'أذكار المساء', 'من حصن المسلم', 'Adhkar', { session: adhkarSession }],
-            ['brain', 'حفظ القرآن', 'ورد واختبار ومراجعة', 'Hifz', undefined],
-            ['arch', 'صلواتي', 'سجّل صلاتك', 'PrayerTracker', undefined],
-            ['chart', 'إحصائياتي', 'تفاصيل رحلتك وتقاريرك', 'Insights', undefined],
-            ['palm', 'واحتي', 'ازرع واسقِ', 'Oasis', undefined],
-            ['sun', 'تنبيهات الصلاة', 'قبل الأذان وبعد الصلاة', 'PrayerReminders', undefined],
-          ] as const).map(([icon, title, sub, to, params]) => (
-            <Pressable key={to} onPress={() => navigation.navigate(to, params)} style={s.tile}>
-              <View style={s.tileIcon}><Icon name={icon} color={C.ink} /></View>
-              <Text style={s.tileTitle}>{title}</Text>
-              <Text style={s.tileSub}>{sub}</Text>
+          <View style={s.shortcuts}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="القرآن الكريم، اقرأ واستمع"
+              onPress={() => open("QuranReader")}
+              style={({ pressed }) => [
+                s.shortcut,
+                pressed && { opacity: 0.82 },
+              ]}
+            >
+              <ImageBackground
+                source={require("../../assets/design/quran-card.png")}
+                style={[
+                  StyleSheet.absoluteFill,
+                  { width: "100%", height: "100%" },
+                ]}
+                imageStyle={{ opacity: night ? 0.72 : 1 }}
+              />
+              <LinearGradient
+                colors={["transparent", night ? "#0D2B2AF2" : "#FFFCF5F2"]}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={{ height: 79 }} />
+              <View style={s.shortcutBottom}>
+                <View>
+                  <Text style={s.shortcutTitle}>القرآن الكريم</Text>
+                  <Text style={s.shortcutMeta}>
+                    {pages
+                      ? `${ar(pages)} صفحات قرأتها اليوم`
+                      : "تلاوة تطمئنّ بها روحك"}
+                  </Text>
+                </View>
+                <SirajIcon name="arrow" size={18} color={palette.accent} />
+              </View>
             </Pressable>
-          ))}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                session === "morning" ? "أذكار الصباح" : "أذكار المساء"
+              }
+              onPress={() => open("Adhkar", { session })}
+              style={({ pressed }) => [
+                s.shortcut,
+                pressed && { opacity: 0.82 },
+              ]}
+            >
+              <ImageBackground
+                source={require("../../assets/design/athkar-card.png")}
+                style={[
+                  StyleSheet.absoluteFill,
+                  { width: "100%", height: "100%" },
+                ]}
+                imageStyle={{ opacity: night ? 0.72 : 1 }}
+              />
+              <LinearGradient
+                colors={["transparent", night ? "#0D2B2AF2" : "#FFFCF5F2"]}
+                style={StyleSheet.absoluteFill}
+              />
+              <View style={{ height: 79 }} />
+              <View style={s.shortcutBottom}>
+                <View>
+                  <Text style={s.shortcutTitle}>الأذكار</Text>
+                  <Text style={s.shortcutMeta}>
+                    {dhikrDone
+                      ? "أتممت أذكارك اليوم ✓"
+                      : session === "morning"
+                        ? "ابدأ صباحك بذكره"
+                        : "سكينةٌ لختام يومك"}
+                  </Text>
+                </View>
+                <SirajIcon name="arrow" size={18} color={palette.accent} />
+              </View>
+            </Pressable>
+          </View>
+          <View style={s.habits}>
+            <View style={s.sectionRow}>
+              <View>
+                <Text style={s.sectionTitle}>عاداتي اليومية</Text>
+                <Text style={s.sectionCaption}>خطوات صغيرة، وأثرٌ يكبر</Text>
+              </View>
+              <Text style={s.completed}>
+                {ar(done)} / {ar(daily.length)} مكتملة
+              </Text>
+            </View>
+            <View style={s.progress}>
+              <View
+                style={[
+                  s.progressFill,
+                  {
+                    width: `${daily.length ? (100 * done) / daily.length : 0}%`,
+                  },
+                ]}
+              />
+            </View>
+            {daily.length === 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => open("HabitSetup", { first: false })}
+                style={s.empty}
+              >
+                <SirajIcon name="plus" size={26} color={palette.accent} />
+                <Text style={s.emptyTitle}>رحلتك تبدأ بعادة</Text>
+                <Text style={s.sectionCaption}>
+                  اختر عادة تناسب يومك، وسنتابعها معك.
+                </Text>
+                <Text style={s.textLink}>اختر أول عادة ←</Text>
+              </Pressable>
+            ) : (
+              daily.map((p) => {
+                const target = effectiveTarget(p, day);
+                const value = logs[p.id] || 0;
+                const complete = value >= target;
+                return (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={p.title}
+                    key={p.id}
+                    onPress={() => openHabit(p)}
+                    style={s.habitRow}
+                  >
+                    <View
+                      style={[
+                        s.check,
+                        complete && {
+                          backgroundColor: palette.positive,
+                          borderColor: palette.positive,
+                        },
+                      ]}
+                    >
+                      {complete && (
+                        <SirajIcon
+                          name="check"
+                          size={14}
+                          color={night ? "#143A2C" : "#fff"}
+                        />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.habitName}>{p.title}</Text>
+                      <Text style={s.habitDetail}>
+                        {ar(Math.round(value * 100) / 100)} من {ar(target)}{" "}
+                        {p.unit}
+                      </Text>
+                    </View>
+                    <SirajIcon
+                      name={
+                        p.category === "الصلاة"
+                          ? "mosque"
+                          : p.category === "القرآن"
+                            ? "book"
+                            : "spark"
+                      }
+                      size={20}
+                      color={palette.accent}
+                    />
+                  </Pressable>
+                );
+              })
+            )}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => open("HabitSetup", { first: false })}
+              style={s.addHabit}
+            >
+              <SirajIcon name="plus" size={15} color={palette.accent} />
+              <Text style={s.textLink}>إضافة عادة</Text>
+            </Pressable>
+          </View>
+          <View style={s.tools}>
+            {(
+              [
+                ["mosque", "صلواتي", "PrayerTracker"],
+                ["book", "الحفظ والمراجعة", "Hifz"],
+                ["chart", "إحصائياتي", "Insights"],
+              ] as [IconName, string, string][]
+            ).map(([icon, label, screen]) => (
+              <Pressable
+                key={screen}
+                accessibilityRole="button"
+                onPress={() => open(screen)}
+                style={s.tool}
+              >
+                <View style={s.toolIcon}>
+                  <SirajIcon name={icon} color={palette.accent} />
+                </View>
+                <Text style={s.toolText}>{label}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="ادخل واحتك"
+            onPress={() => open("Oasis")}
+            style={s.oasisCard}
+          >
+            <ImageBackground
+              source={SCENES[theme]}
+              resizeMode="cover"
+              style={[
+                StyleSheet.absoluteFill,
+                { width: "100%", height: "100%" },
+              ]}
+            />
+            <LinearGradient
+              colors={
+                night
+                  ? ["rgba(5,26,27,.15)", "rgba(5,26,27,.94)"]
+                  : ["rgba(255,249,230,.1)", "rgba(248,244,234,.95)"]
+              }
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={s.oasisCopy}>
+              <Text style={s.sectionTitle}>واحتك تنمو بخيرك</Text>
+              <Text style={s.sectionCaption}>كل عمل طيب يترك أثرًا</Text>
+            </View>
+            <View style={s.oasisAction}>
+              <SirajIcon name="arrow" color={palette.accent} />
+            </View>
+          </Pressable>
+          <Text style={s.footer}>سراج · نورٌ ينمو معك</Text>
         </View>
       </ScrollView>
-
-      {/* bottom navigation */}
-      <View style={[s.tabs, { paddingBottom: insets.bottom + 8 }]}>
-        {([
-          ['home', 'الرئيسية', 'Home'],
-          ['palm', 'الواحة', 'Oasis'],
-          ['arch', 'صلواتي', 'PrayerTracker'],
-          ['chart', 'الإحصائيات', 'Insights'],
-        ] as const).map(([icon, label, to]) => {
-          const on = to === 'Home';
-          return (
-            <Pressable key={to} onPress={() => !on && navigation.navigate(to)} style={s.tab} accessibilityRole="tab" accessibilityState={{ selected: on }}>
-              <Icon name={icon} color={on ? C.gold : C.ink2} />
-              <Text style={[s.tabLabel, on && { color: C.gold }]}>{label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <BottomDock
+        navigation={navigation}
+        active="Home"
+        bottom={insets.bottom}
+      />
+      <Modal
+        visible={modal !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!busy) setModal(null);
+        }}
+      >
+        <KeyboardAvoidingView
+          style={s.modalBackdrop}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="إغلاق النافذة"
+            style={StyleSheet.absoluteFill}
+            onPress={() => !busy && setModal(null)}
+          />
+          <View style={[s.sheet, { paddingBottom: insets.bottom + 24 }]}>
+            <View style={s.sheetHandle} />
+            <View style={s.sectionRow}>
+              <Text style={s.sectionTitle}>
+                {modal === "appearance"
+                  ? "على ذوقك"
+                  : modal === "city"
+                    ? "مواقيت مدينتك"
+                    : "سجّل تقدمك"}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setModal(null)}
+                disabled={busy}
+              >
+                <Text style={s.textLink}>إغلاق</Text>
+              </Pressable>
+            </View>
+            {modal === "appearance" && (
+              <>
+                <Text style={s.sheetLabel}>المظهر</Text>
+                <View style={s.themeOptions}>
+                  {(
+                    [
+                      ["dark", "moon", "ليلي"],
+                      ["light", "sun", "نهاري"],
+                      ["system", "spark", "حسب الجهاز"],
+                    ] as [AppearancePreference, IconName, string][]
+                  ).map(([value, icon, label]) => (
+                    <Pressable
+                      accessibilityRole="radio"
+                      aria-checked={appearance === value}
+                      accessibilityLabel={label}
+                      accessibilityState={{
+                        checked: appearance === value,
+                        disabled: busy,
+                      }}
+                      disabled={busy}
+                      onPress={() => void changeAppearance(value)}
+                      key={value}
+                      style={[
+                        s.themeOption,
+                        appearance === value && {
+                          borderColor: palette.accent,
+                          backgroundColor: palette.soft,
+                        },
+                      ]}
+                    >
+                      <SirajIcon name={icon} color={palette.accent} />
+                      <Text style={s.toolText}>{label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  style={s.sheetButton}
+                  onPress={() => {
+                    setModal(null);
+                    open("ProfileSetup", { edit: true });
+                  }}
+                >
+                  <SirajIcon name="user" color={palette.accent} />
+                  <Text style={s.habitName}>تعديل الاسم والملف الشخصي</Text>
+                  <SirajIcon name="arrow" color={palette.accent} />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  style={s.sheetButton}
+                  onPress={() => {
+                    setModal(null);
+                    open("PrayerReminders");
+                  }}
+                >
+                  <SirajIcon name="bell" color={palette.accent} />
+                  <Text style={s.habitName}>تنبيهات الصلاة</Text>
+                  <SirajIcon name="arrow" color={palette.accent} />
+                </Pressable>
+              </>
+            )}
+            {modal === "city" && (
+              <>
+                <TextInput
+                  accessibilityLabel="ابحث عن مدينة"
+                  value={search}
+                  onChangeText={setSearch}
+                  placeholder="ابحث عن مدينة…"
+                  placeholderTextColor={palette.muted}
+                  style={s.input}
+                  textAlign="right"
+                />
+                <ScrollView
+                  style={{ maxHeight: 220 }}
+                  keyboardShouldPersistTaps="handled"
+                >
+                  {prayer.cities
+                    .filter((c) =>
+                      (c.cityNameAr + c.cityNameEn + c.countryNameAr)
+                        .toLowerCase()
+                        .includes(search.toLowerCase()),
+                    )
+                    .map((c) => (
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={busy}
+                        key={c.id}
+                        style={s.sheetButton}
+                        onPress={async () => {
+                          setBusy(true);
+                          try {
+                            await prayer.setCity(c.id);
+                            setModal(null);
+                          } catch {
+                            Alert.alert("تعذّر الحفظ", "حاول مرة أخرى.");
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
+                      >
+                        <Text style={s.habitName}>
+                          {c.cityNameAr} · {c.countryNameAr}
+                        </Text>
+                      </Pressable>
+                    ))}
+                </ScrollView>
+                <Text style={s.sheetLabel}>طريقة الحساب</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ gap: 8 }}
+                >
+                  {METHODS.map(([id, label]) => (
+                    <Pressable
+                      disabled={busy}
+                      key={id}
+                      style={[
+                        s.methodChip,
+                        prayer.method === id && { borderColor: palette.accent },
+                      ]}
+                      onPress={async () => {
+                        setBusy(true);
+                        try {
+                          await prayer.changeMethod(id);
+                        } catch {
+                          Alert.alert("تعذّر الحفظ", "حاول مرة أخرى.");
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                    >
+                      <Text style={s.toolText}>{label}</Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+                <Pressable
+                  disabled={busy}
+                  style={s.primaryButton}
+                  onPress={async () => {
+                    setBusy(true);
+                    try {
+                      const ok = await prayer.detect();
+                      if (ok) setModal(null);
+                      else
+                        Alert.alert(
+                          "الموقع",
+                          "اسمح بالموقع من إعدادات الجهاز، أو اختر مدينتك من القائمة.",
+                        );
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  <Text style={s.primaryText}>استخدم موقعي الحالي</Text>
+                </Pressable>
+              </>
+            )}
+            {modal === "habit" && selectedPlan && (
+              <>
+                <Text style={s.sheetLabel}>
+                  {selectedPlan.title} · سجل اليوم
+                </Text>
+                <View style={s.themeOptions}>
+                  {(["add", "set"] as const).map((mode) => (
+                    <Pressable
+                      key={mode}
+                      accessibilityRole="radio"
+                      aria-checked={entryMode === mode}
+                      accessibilityState={{ checked: entryMode === mode }}
+                      onPress={() => {
+                        setEntryMode(mode);
+                        setAmount(
+                          mode === "set"
+                            ? String(logs[selectedPlan.id] || 0)
+                            : "1",
+                        );
+                      }}
+                      style={[
+                        s.methodChip,
+                        { flex: 1 },
+                        entryMode === mode && { borderColor: palette.accent },
+                      ]}
+                    >
+                      <Text style={s.toolText}>
+                        {mode === "add" ? "إضافة عدد" : "تصحيح الإجمالي"}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <TextInput
+                  accessibilityLabel="العدد المراد تسجيله"
+                  style={s.input}
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="number-pad"
+                  selectTextOnFocus
+                  textAlign="right"
+                />
+                <Pressable
+                  disabled={busy}
+                  accessibilityRole="button"
+                  style={s.primaryButton}
+                  onPress={() => void saveHabit()}
+                >
+                  <Text style={s.primaryText}>
+                    {busy ? "جارٍ الحفظ…" : "حفظ التقدم"}
+                  </Text>
+                </Pressable>
+              </>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
-
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: C.paper },
-  hero: { width: '100%', overflow: 'hidden', backgroundColor: '#d9b77e' },
-  heroTop: { position: 'absolute', top: 0, left: 0, right: 0 },
-  heroBottom: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 150 },
-  heroHead: { position: 'absolute', top: 0, left: 0, right: 0, flexDirection: 'row-reverse', alignItems: 'center', paddingHorizontal: 20 },
-  salam: { fontFamily: F.m, fontSize: 13, color: '#e6eadf', textAlign: 'right' },
-  greet: { fontFamily: F.b, fontSize: 26, color: '#fff', textAlign: 'right' },
-  glassBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(16,26,22,.45)', borderWidth: 1, borderColor: 'rgba(255,255,255,.18)', alignItems: 'center', justifyContent: 'center' },
-  oasisChip: { position: 'absolute', left: 16, right: 16, bottom: 58, flexDirection: 'row-reverse', alignItems: 'center', gap: 12, padding: 12, paddingHorizontal: 14, borderRadius: 20, backgroundColor: 'rgba(16,30,26,.62)', borderWidth: 1, borderColor: 'rgba(255,255,255,.16)' },
-  oasisName: { fontFamily: F.b, fontSize: 16, color: '#fff', textAlign: 'right' },
-  oasisMeta: { fontFamily: F.r, fontSize: 12, color: '#e9e2cf', textAlign: 'right', marginTop: 1 },
-  enter: { backgroundColor: C.goldSoft, borderRadius: 999, paddingVertical: 9, paddingHorizontal: 16 },
-  enterText: { fontFamily: F.b, fontSize: 14, color: C.night },
-  nudge: { fontFamily: F.s, fontSize: 13, color: C.goldSoft, textAlign: 'right' },
-  dot: { position: 'absolute', top: -3, right: -3, width: 12, height: 12, borderRadius: 6, backgroundColor: '#e2553a', borderWidth: 2, borderColor: '#fff' },
-  prayerCard: { marginHorizontal: 14, marginTop: -40, borderRadius: 24, padding: 18, gap: 14, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 18, shadowOffset: { width: 0, height: 10 }, elevation: 6 },
-  rowBetween: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
-  kicker: { fontFamily: F.m, fontSize: 12, color: '#b9c9bf', textAlign: 'right' },
-  nextName: { fontFamily: F.b, fontSize: 30, color: '#fff', textAlign: 'right', lineHeight: 42 },
-  nextTime: { fontFamily: F.s, fontSize: 22, color: C.goldSoft },
-  until: { fontFamily: F.r, fontSize: 13, color: '#d8e2d9' },
-  prayerRow: { flexDirection: 'row-reverse', gap: 6 },
-  pItem: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 14, backgroundColor: 'rgba(255,255,255,.07)' },
-  pItemOn: { backgroundColor: C.goldSoft },
-  pName: { fontFamily: F.s, fontSize: 12, color: '#f1ece0' },
-  pTime: { fontFamily: F.r, fontSize: 11, color: '#c7d3ca', marginTop: 2 },
-  pOn: { color: C.night },
-  inline: { flexDirection: 'row-reverse', alignItems: 'center', gap: 4 },
-  link: { fontFamily: F.m, fontSize: 12, color: C.goldSoft },
-  picker: { maxHeight: 220, backgroundColor: 'rgba(255,255,255,.06)', borderRadius: 14 },
-  pickRow: { paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,.12)' },
-  pickText: { fontFamily: F.r, fontSize: 14, color: '#f1ece0', textAlign: 'right' },
-  note: { fontFamily: F.r, fontSize: 11, color: C.muted, textAlign: 'right', marginHorizontal: 22, marginTop: 8 },
-  section: { marginHorizontal: 14, marginTop: 22, backgroundColor: C.card, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: C.line },
-  h2: { fontFamily: F.b, fontSize: 19, color: C.ink, textAlign: 'right' },
-  count: { fontFamily: F.s, fontSize: 14, color: C.gold },
-  empty: { alignItems: 'center', gap: 8, paddingVertical: 22 },
-  emptyText: { fontFamily: F.m, fontSize: 14, color: C.ink2 },
-  habit: { paddingVertical: 14, borderBottomWidth: 1, borderColor: '#efe5d1', gap: 9 },
-  habitTitle: { fontFamily: F.s, fontSize: 16, color: C.ink, textAlign: 'right', flex: 1 },
-  habitVal: { fontFamily: F.m, fontSize: 12, color: C.muted },
-  track: { height: 7, backgroundColor: '#ebe3d2', borderRadius: 7, overflow: 'hidden' },
-  fill: { height: 7, backgroundColor: '#12816d', borderRadius: 7 },
-  habitActions: { flexDirection: 'row-reverse', alignItems: 'center', gap: 8 },
-  ghost: { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#efe6d3' },
-  ghostText: { fontFamily: F.s, fontSize: 12, color: C.ink },
-  stepBtn: { width: 38, height: 38, borderRadius: 12, backgroundColor: '#efe6d3', alignItems: 'center', justifyContent: 'center' },
-  stepText: { fontFamily: F.b, fontSize: 18, color: C.ink },
-  input: { width: 56, height: 38, borderWidth: 1, borderColor: '#ddd0b6', borderRadius: 12, textAlign: 'center', fontFamily: F.m, color: C.ink, backgroundColor: '#fff' },
-  logBtn: { height: 38, paddingHorizontal: 16, borderRadius: 12, backgroundColor: C.ink, justifyContent: 'center' },
-  logText: { fontFamily: F.b, fontSize: 14, color: '#fff' },
-  addRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'center', gap: 6, paddingTop: 14 },
-  addText: { fontFamily: F.s, fontSize: 14, color: C.gold },
-  grid: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 10, marginHorizontal: 14, marginTop: 14 },
-  tile: { width: '48.4%', backgroundColor: C.card, borderRadius: 20, padding: 14, borderWidth: 1, borderColor: C.line, gap: 2 },
-  tileIcon: { width: 40, height: 40, borderRadius: 13, backgroundColor: '#efe6d3', alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-end', marginBottom: 6 },
-  tileTitle: { fontFamily: F.b, fontSize: 15, color: C.ink, textAlign: 'right' },
-  tileSub: { fontFamily: F.r, fontSize: 12, color: C.muted, textAlign: 'right' },
-  notifCard: { marginHorizontal: 14, marginTop: 16, backgroundColor: '#fbf0d9', borderRadius: 20, padding: 16, borderWidth: 1, borderColor: '#ecd29a', gap: 4 },
-  notifTitle: { fontFamily: F.b, fontSize: 16, color: C.ink, textAlign: 'right' },
-  notifSub: { fontFamily: F.r, fontSize: 13, color: C.ink2, textAlign: 'right', lineHeight: 21 },
-  tabs: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row-reverse', justifyContent: 'space-around', backgroundColor: 'rgba(255,250,240,.97)', borderTopWidth: 1, borderColor: C.line, paddingTop: 9 },
-  tab: { alignItems: 'center', gap: 2, minWidth: 64 },
-  tabLabel: { fontFamily: F.s, fontSize: 11, color: C.ink2 },
-});
+function styles(p: HomePalette) {
+  return StyleSheet.create({
+    root: { flex: 1, backgroundColor: p.background },
+    hero: { height: 290, width: "100%", maxWidth: 680, alignSelf: "center" },
+    topbar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 24,
+      height: 68,
+    },
+    iconButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 24,
+      borderWidth: 1,
+      borderColor: p.border,
+      backgroundColor: p.glass,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    brand: {
+      fontFamily: "Ruqaa",
+      fontSize: 49,
+      lineHeight: 70,
+      color: p.accent,
+      paddingHorizontal: 8,
+    },
+    greeting: {
+      fontFamily: F.b,
+      color: p.text,
+      fontSize: 23,
+      textAlign: "center",
+      marginTop: 12,
+    },
+    blessing: {
+      fontFamily: F.r,
+      fontSize: 12,
+      color: p.secondary,
+      textAlign: "center",
+      marginTop: 3,
+    },
+    date: {
+      fontFamily: F.r,
+      color: p.secondary,
+      fontSize: 10,
+      textAlign: "center",
+      marginTop: 7,
+    },
+    body: {
+      width: "100%",
+      maxWidth: 680,
+      alignSelf: "center",
+      paddingHorizontal: 18,
+      gap: 12,
+      marginTop: -53,
+    },
+    prayerCard: {
+      minHeight: 122,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 15,
+      borderRadius: 23,
+      padding: 19,
+      borderWidth: 1,
+      borderColor: p.border,
+      overflow: "hidden",
+    },
+    countdown: { width: 78, height: 78 },
+    countdownText: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    countdownValue: { fontFamily: F.s, fontSize: 19, color: p.text },
+    countdownCaption: { fontFamily: F.r, fontSize: 10, color: p.secondary },
+    eyebrow: { fontFamily: F.m, fontSize: 11, color: p.secondary },
+    prayerName: {
+      fontFamily: F.b,
+      fontSize: 29,
+      lineHeight: 42,
+      color: p.text,
+    },
+    prayerTime: { fontFamily: F.r, fontSize: 14, color: p.text },
+    mosque: { width: 53, opacity: 0.6, alignItems: "center" },
+    prayerStrip: {
+      backgroundColor: p.surface,
+      borderWidth: 1,
+      borderColor: p.border,
+      borderRadius: 20,
+      padding: 5,
+      flexDirection: "row-reverse",
+    },
+    prayerItem: {
+      flex: 1,
+      alignItems: "center",
+      paddingVertical: 10,
+      borderRadius: 15,
+      gap: 5,
+    },
+    prayerLabel: { fontFamily: F.m, fontSize: 11, color: p.secondary },
+    prayerSmall: { fontFamily: F.r, fontSize: 10, color: p.secondary },
+    location: {
+      flexDirection: "row-reverse",
+      justifyContent: "center",
+      alignItems: "center",
+      gap: 5,
+      paddingVertical: 2,
+    },
+    locationText: { fontFamily: F.r, fontSize: 10, color: p.muted },
+    shortcuts: { flexDirection: "row-reverse", gap: 12 },
+    shortcut: {
+      flex: 1,
+      minHeight: 132,
+      borderRadius: 19,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: p.border,
+    },
+    shortcutBottom: {
+      flexDirection: "row-reverse",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 12,
+      paddingBottom: 12,
+      gap: 4,
+    },
+    shortcutTitle: {
+      fontFamily: F.b,
+      fontSize: 16,
+      color: p.text,
+      textAlign: "right",
+    },
+    shortcutMeta: {
+      fontFamily: F.r,
+      fontSize: 10,
+      color: p.secondary,
+      textAlign: "right",
+      marginTop: 3,
+    },
+    habits: {
+      backgroundColor: p.surface,
+      borderWidth: 1,
+      borderColor: p.border,
+      borderRadius: 22,
+      padding: 16,
+      gap: 12,
+    },
+    sectionRow: {
+      flexDirection: "row-reverse",
+      justifyContent: "space-between",
+      alignItems: "center",
+      gap: 8,
+    },
+    sectionTitle: {
+      fontFamily: F.b,
+      fontSize: 19,
+      color: p.text,
+      textAlign: "right",
+    },
+    sectionCaption: {
+      fontFamily: F.r,
+      fontSize: 11,
+      color: p.secondary,
+      textAlign: "right",
+      lineHeight: 21,
+    },
+    completed: { fontFamily: F.r, fontSize: 11, color: p.secondary },
+    progress: {
+      height: 5,
+      borderRadius: 5,
+      backgroundColor: p.track,
+      overflow: "hidden",
+    },
+    progressFill: {
+      height: 5,
+      backgroundColor: p.positive,
+      borderRadius: 5,
+      alignSelf: "flex-end",
+    },
+    habitRow: {
+      flexDirection: "row-reverse",
+      alignItems: "center",
+      gap: 12,
+      paddingVertical: 11,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderColor: p.border,
+    },
+    check: {
+      width: 21,
+      height: 21,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: p.muted,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    habitName: {
+      fontFamily: F.m,
+      fontSize: 13,
+      color: p.text,
+      textAlign: "right",
+    },
+    habitDetail: {
+      fontFamily: F.r,
+      fontSize: 10,
+      color: p.secondary,
+      textAlign: "right",
+      marginTop: 3,
+    },
+    addHabit: {
+      flexDirection: "row-reverse",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      paddingVertical: 5,
+    },
+    textLink: { fontFamily: F.s, color: p.accent, fontSize: 12 },
+    empty: { alignItems: "center", paddingVertical: 18, gap: 10 },
+    emptyTitle: { fontFamily: F.s, fontSize: 16, color: p.text },
+    tools: { flexDirection: "row-reverse", gap: 9, paddingVertical: 5 },
+    tool: { flex: 1, alignItems: "center", gap: 10, paddingVertical: 12 },
+    toolIcon: {
+      backgroundColor: p.soft,
+      width: 47,
+      height: 47,
+      borderRadius: 17,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    toolText: {
+      fontFamily: F.m,
+      fontSize: 11,
+      color: p.text,
+      textAlign: "center",
+    },
+    oasisCard: {
+      height: 155,
+      borderRadius: 22,
+      overflow: "hidden",
+      borderWidth: 1,
+      borderColor: p.border,
+      justifyContent: "flex-end",
+      padding: 18,
+      flexDirection: "row-reverse",
+      alignItems: "flex-end",
+    },
+    oasisCopy: { flex: 1 },
+    oasisAction: {
+      width: 38,
+      height: 38,
+      borderRadius: 20,
+      backgroundColor: p.glass,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    footer: {
+      fontFamily: "Ruqaa",
+      fontSize: 20,
+      color: p.muted,
+      textAlign: "center",
+      paddingVertical: 12,
+    },
+    error: {
+      fontFamily: F.r,
+      fontSize: 12,
+      color: "#D98973",
+      textAlign: "right",
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: "rgba(0,12,13,.65)",
+      justifyContent: "flex-end",
+    },
+    sheet: {
+      width: "100%",
+      maxWidth: 680,
+      alignSelf: "center",
+      backgroundColor: p.surface,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      padding: 24,
+      gap: 18,
+      borderWidth: 1,
+      borderColor: p.border,
+    },
+    sheetHandle: {
+      width: 36,
+      height: 4,
+      borderRadius: 3,
+      backgroundColor: p.muted,
+      alignSelf: "center",
+      marginBottom: 2,
+    },
+    sheetLabel: {
+      fontFamily: F.m,
+      fontSize: 13,
+      color: p.secondary,
+      textAlign: "right",
+    },
+    themeOptions: { flexDirection: "row-reverse", gap: 10 },
+    themeOption: {
+      flex: 1,
+      paddingVertical: 18,
+      borderRadius: 17,
+      borderWidth: 1,
+      borderColor: p.border,
+      alignItems: "center",
+      gap: 9,
+    },
+    sheetButton: {
+      flexDirection: "row-reverse",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderColor: p.border,
+    },
+    input: {
+      backgroundColor: p.raised,
+      borderWidth: 1,
+      borderColor: p.border,
+      borderRadius: 14,
+      padding: 14,
+      fontFamily: F.r,
+      fontSize: 16,
+      color: p.text,
+    },
+    methodChip: {
+      padding: 12,
+      borderRadius: 13,
+      borderWidth: 1,
+      borderColor: p.border,
+    },
+    primaryButton: {
+      padding: 16,
+      borderRadius: 15,
+      backgroundColor: p.accent,
+      alignItems: "center",
+    },
+    primaryText: { fontFamily: F.b, fontSize: 15, color: p.accentText },
+  });
+}
