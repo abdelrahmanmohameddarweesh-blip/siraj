@@ -18,7 +18,7 @@ export function useNotificationRouter(nav: NavigationContainerRefWithCurrent<any
     const go = async (data: any, cold: boolean) => {
       const destination = data?.screen === 'Sohba' && typeof data.circleId === 'string' && /^[A-Za-z0-9]{1,40}$/.test(data.circleId) ? { screen: 'Sohba', params: { circleId: data.circleId } } : routeFor(data);
       let hasProfile = false;
-      try { hasProfile = !!(await loadProfile()); } catch { /* collect profile before navigating */ }
+      try { hasProfile = destination.screen === 'Sohba' || !!(await loadProfile()); } catch { /* collect profile before navigating */ }
       const r = hasProfile ? destination : { screen: 'ProfileSetup', params: { nextRoute: destination.screen, nextParams: destination.params } };
       const doNav = () => {
         if (!alive) return;

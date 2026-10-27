@@ -37,6 +37,14 @@ class Query {
     q.filters = [...(this.filters || []), { field, op, value }];
     return q;
   }
+  orderBy(field, direction) {
+    this.order = { field, direction };
+    return this;
+  }
+  limit(count) {
+    this.count = count;
+    return this;
+  }
   async get() {
     return querySnapshot(this);
   }
@@ -63,7 +71,14 @@ function querySnapshot(q) {
         f.op === ">=" ? s.data()[f.field] >= f.value : false,
       ),
     );
-  return { docs, size: docs.length };
+  if (q.order)
+    docs.sort(
+      (a, b) =>
+        (a.data()[q.order.field] - b.data()[q.order.field]) *
+        (q.order.direction === "desc" ? -1 : 1),
+    );
+  const result = q.count ? docs.slice(0, q.count) : docs;
+  return { docs: result, size: result.length };
 }
 function merge(a, b) {
   const r = { ...a };
@@ -163,20 +178,34 @@ const create = (uid, extra = {}) =>
     visible: true,
     startDay: today(),
     timeZone: "UTC",
+    allowPersonalGoals: true,
+    showPendingMembers: true,
     ...extra,
   });
-test("create/join are authenticated, recoverable, capped and idempotent", async () => {
+test("create/join allow anonymous identities, preserve legacy goals, and remain capped/idempotent", async () => {
   await assert.rejects(create(null), (e) => e.code === "unauthenticated");
-  await assert.rejects(
-    functions.sohbaCreate({
-      auth: {
-        uid: "anonymous",
-        token: { firebase: { sign_in_provider: "anonymous" } },
-      },
-      data: {},
-    }),
-    (e) => e.code === "failed-precondition",
-  );
+  const anon = await functions.sohbaCreate({
+    auth: {
+      uid: "anonymous",
+      token: { firebase: { sign_in_provider: "anonymous" } },
+    },
+    data: {
+      name: "صحبة بلا بريد",
+      displayName: "رفيق",
+      activity: "reading",
+      goal: 2,
+      startDay: today(),
+      timeZone: "UTC",
+    },
+  });
+  const joined = await functions.sohbaJoin({
+    auth: {
+      uid: "anonymousFriend",
+      token: { firebase: { sign_in_provider: "anonymous" } },
+    },
+    data: { code: anon.code, displayName: "رفيق" },
+  });
+  assert.equal(joined.circleId, anon.circleId);
   const { circleId, code } = await create("owner");
   const preview = await call("outsider", "sohbaPreview", { code });
   assert.equal(preview.ownerUid, undefined);
@@ -392,4 +421,121 @@ test("reminders are opt-in, skip completed personal intentions and do not send t
   } finally {
     global.fetch = oldFetch;
   }
+});
+
+test("creator customization is enforced on capacity, shared goals, hidden names, feed and prior progress", async () => {
+  const { circleId, code } = await create("customOwner", {
+    maxMembers: 2,
+    endDay: require("../domain").days(today(), 30)[29],
+    showNames: false,
+    showGroupProgress: false,
+    showMemberProgress: true,
+    showCompletedMembers: false,
+    showPendingMembers: false,
+    allowPersonalGoals: false,
+    activity: "prayers",
+    goal: 5,
+  });
+  const root = `sohbaCircles/${circleId}`;
+  await call("customFriend", "sohbaJoin", {
+    code,
+    displayName: "اسم خاص",
+    activity: "reading",
+    goal: 1,
+  });
+  assert.equal(rows.get(root + "/members/customFriend").activity, "prayers");
+  assert.equal(rows.get(root + "/members/customFriend").goal, 5);
+  await assert.rejects(
+    call("overflow", "sohbaJoin", { code, displayName: "رفيق" }),
+  );
+  await call("customFriend", "sohbaCheckin", {
+    circleId,
+    day: today(),
+    value: 5,
+  });
+  assert.equal(rows.get(root + "/companions/customFriend").name, "رفيق 2");
+  assert.equal(
+    rows.get(root + "/companions/customFriend").statuses[today()],
+    null,
+  );
+  await call("customFriend", "sohbaEncourage", {
+    circleId,
+    message: "معًا نستمر",
+  });
+  const feed = await call("customOwner", "sohbaFeed", { circleId });
+  assert.equal(feed[0].name, "رفيق 2");
+  assert.equal(JSON.stringify(feed).includes("اسم خاص"), false);
+  await assert.rejects(
+    call("stranger", "sohbaFeed", { circleId }),
+    (e) => e.code === "permission-denied",
+  );
+  await assert.rejects(
+    call("customFriend", "sohbaUpdateCircle", {
+      circleId,
+      name: "تعديل",
+      maxMembers: 3,
+    }),
+    (e) => e.code === "permission-denied",
+  );
+  await call("customOwner", "sohbaUpdateCircle", {
+    circleId,
+    name: "صحبة مخصصة",
+    maxMembers: 3,
+    showNames: true,
+    showGroupProgress: true,
+    showMemberProgress: true,
+    showCompletedMembers: true,
+    showPendingMembers: true,
+  });
+  assert.equal(rows.get(root + "/companions/customFriend").name, "اسم خاص");
+  assert.equal(
+    rows.get(root + "/companions/customFriend").progress[today()],
+    100,
+  );
+  await call("customOwner", "sohbaUpdateCircle", {
+    circleId,
+    name: "صحبة مخصصة",
+    maxMembers: 3,
+    showNames: false,
+    showGroupProgress: false,
+    showMemberProgress: false,
+    showCompletedMembers: false,
+    showPendingMembers: false,
+  });
+  assert.equal(rows.get(root + "/companions/customFriend").name, "رفيق 2");
+  assert.equal(
+    rows.get(root + "/companions/customFriend").statuses[today()],
+    null,
+  );
+  assert.equal(
+    (await call("customOwner", "sohbaFeed", { circleId }))[0].name,
+    "رفيق 2",
+  );
+});
+test("custom habit check-ins replace the daily total without duplicate completion", async () => {
+  const { circleId } = await create("manualOwner", {
+    activity: "custom",
+    habitName: "قراءة كتاب",
+    goal: 3,
+    allowPersonalGoals: false,
+  });
+  for (const value of [3, 3, 3])
+    await call("manualOwner", "sohbaCheckin", {
+      circleId,
+      day: today(),
+      value,
+    });
+  assert.equal(
+    rows.get(`sohbaCircles/${circleId}/days/${today()}`).completed,
+    1,
+  );
+  await call("manualOwner", "sohbaCheckin", {
+    circleId,
+    day: today(),
+    value: 1,
+  });
+  assert.equal(
+    rows.get(`sohbaCircles/${circleId}/days/${today()}`).completed,
+    0,
+  );
 });

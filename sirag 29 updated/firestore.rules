@@ -52,11 +52,12 @@ service cloud.firestore {
         allow write: if false;
       }
       match /days/{day} {
-        allow read: if circleMember(circleId);
+        allow read: if circleMember(circleId) && (!('showGroupProgress' in get(/databases/$(database)/documents/sohbaCircles/$(circleId)).data) || get(/databases/$(database)/documents/sohbaCircles/$(circleId)).data.showGroupProgress != false);
         allow write: if false;
       }
       match /encouragement/{id} {
-        allow read: if circleMember(circleId);
+        // Served by sohbaFeed with current aliases, including legacy records.
+        allow read: if false;
         allow write: if false;
       }
     }

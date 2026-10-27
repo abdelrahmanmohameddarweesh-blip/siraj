@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { Linking } from "react-native";
 import type { NavigationContainerRefWithCurrent } from "@react-navigation/native";
-import { loadProfile } from "../profile/profileStore";
 import { updateJSON } from "../storage/jsonStore";
 import { launch } from "../notifications/launchState";
+import { invitationFromURL } from "./model";
 export function useInvitationRouter(
   nav: NavigationContainerRefWithCurrent<any>,
 ) {
@@ -13,20 +13,11 @@ export function useInvitationRouter(
     let last = "";
     const open = async (url: string | null | undefined) => {
       if (!url || url === last) return;
-      let parsed: URL;
-      try {
-        parsed = new URL(url);
-      } catch {
-        return;
-      }
-      const trusted =
-        parsed.protocol === "sirag:" &&
-        (parsed.hostname === "sohba" || parsed.pathname === "/sohba");
-      // Web invitations are handled by the hosted landing page; never trust an
-      // arbitrary https link to redirect app navigation.
-      if (!trusted) return;
-      const code = (parsed.searchParams.get("code") || "").toUpperCase();
-      if (!/^[A-F0-9]{12}$/.test(code)) return;
+      const code = invitationFromURL(
+        url,
+        process.env.EXPO_PUBLIC_INVITE_BASE_URL || "",
+      );
+      if (!code) return;
       last = url;
       launch.fromNotification = true;
       try {
@@ -35,28 +26,16 @@ export function useInvitationRouter(
           null,
           () => code,
         );
-        const profile = await loadProfile();
         const go = () => {
           if (!alive) return;
           if (!nav.isReady()) {
             timer = setTimeout(go, 150);
             return;
           }
-          if (profile)
-            nav.reset({
-              index: 1,
-              routes: [{ name: "Home" }, { name: "Sohba", params: { code } }],
-            });
-          else
-            nav.reset({
-              index: 0,
-              routes: [
-                {
-                  name: "ProfileSetup",
-                  params: { nextRoute: "Sohba", nextParams: { code } },
-                },
-              ],
-            });
+          nav.reset({
+            index: 1,
+            routes: [{ name: "Home" }, { name: "Sohba", params: { code } }],
+          });
         };
         go();
       } catch {

@@ -11,6 +11,10 @@ const {
   completion,
   InputError,
   reminderDay,
+  settings,
+  journey,
+  entry,
+  projection,
 } = require("./domain");
 initializeApp();
 const db = getFirestore();
@@ -21,15 +25,6 @@ const uidOf = (req) => {
   if (!req.auth) throw new HttpsError("unauthenticated", "سجّل الدخول أولًا");
   return req.auth.uid;
 };
-function requireLinked(req) {
-  const uid = uidOf(req);
-  if (req.auth.token.firebase?.sign_in_provider === "anonymous")
-    throw new HttpsError(
-      "failed-precondition",
-      "اربط حسابك بالبريد الإلكتروني أولًا",
-    );
-  return uid;
-}
 function idOf(value) {
   if (typeof value !== "string" || !/^[A-Za-z0-9]{1,40}$/.test(value))
     throw new HttpsError("invalid-argument", "رمز غير صالح");
@@ -50,9 +45,6 @@ const callable = (handler) =>
       fail(e);
     }
   });
-function publicMember(m) {
-  return { uid: m.uid, name: m.name, visible: m.visible, joinedAt: m.joinedAt };
-}
 async function rate(tx, uid, action, limit) {
   const ref = db.doc(`sohbaLimits/${uid}_${action}`);
   const s = await tx.get(ref);
@@ -63,7 +55,7 @@ async function rate(tx, uid, action, limit) {
   return () => tx.set(ref, { hour, count: count + 1 });
 }
 exports.sohbaCreate = callable(async (req) => {
-  const uid = requireLinked(req),
+  const uid = uidOf(req),
     d = req.data || {},
     name = text(d.name),
     displayName = text(d.displayName),
@@ -78,7 +70,10 @@ exports.sohbaCreate = callable(async (req) => {
   } catch {
     throw new InputError("منطقة زمنية غير صالحة");
   }
-  const journey = days(d.startDay);
+  const dates = journey(d.startDay, d.endDay || days(d.startDay)[6]);
+  const options = settings(d);
+  const sharedGoal = target;
+  const habitName = activity === "custom" ? text(d.habitName) : null;
   if (d.startDay < today || d.startDay > days(today)[6])
     throw new InputError("ابدأ خلال الأيام السبعة القادمة");
   const ref = db.collection("sohbaCircles").doc();
@@ -89,8 +84,10 @@ exports.sohbaCreate = callable(async (req) => {
     name: displayName,
     activity,
     goal: target,
-    visible: d.visible === true,
+    visible: d.visible !== false,
     joinedAt: now,
+    alias: "رفيق 1",
+    nameVisible: true,
     reminderHour: 20,
     reminderMinute: 0,
     reminders: false,
@@ -112,18 +109,26 @@ exports.sohbaCreate = callable(async (req) => {
       ownerUid: uid,
       activity,
       startDay: d.startDay,
-      endDay: journey[6],
+      endDay: dates[dates.length - 1],
       timeZone: zone,
       memberCount: 1,
       createdAt: now,
       inviteHash: codeHash(code),
+      ...options,
+      sharedGoal,
+      habitName,
+      schemaVersion: 2,
+      nextMemberNumber: 2,
     });
     tx.create(ref.collection("members").doc(uid), member);
-    tx.create(ref.collection("companions").doc(uid), publicMember(member));
+    tx.create(
+      ref.collection("companions").doc(uid),
+      projection(member, { ...options }),
+    );
     tx.create(db.doc(`sohbaAccounts/${uid}/circles/${ref.id}`), {
       circleId: ref.id,
       name,
-      endDay: journey[6],
+      endDay: dates[dates.length - 1],
     });
     tx.create(db.doc(`sohbaInvites/${codeHash(code)}`), {
       circleId: ref.id,
@@ -146,6 +151,7 @@ exports.sohbaPreview = callable(async (req) => {
   const c = await circleRef(ref.data().circleId).get();
   if (!c.exists) throw new HttpsError("not-found", "الصحبة غير موجودة");
   const { name, activity, startDay, endDay, memberCount, timeZone } = c.data();
+  const options = settings(c.data(), c.data().schemaVersion !== 2);
   return {
     circleId: c.id,
     name,
@@ -154,10 +160,13 @@ exports.sohbaPreview = callable(async (req) => {
     endDay,
     memberCount,
     timeZone,
+    ...options,
+    sharedGoal: c.data().sharedGoal || 1,
+    habitName: c.data().habitName || null,
   };
 });
 exports.sohbaJoin = callable(async (req) => {
-  const uid = requireLinked(req),
+  const uid = uidOf(req),
     d = req.data || {},
     code = idOf(String(d.code || "").toUpperCase()),
     name = text(d.displayName);
@@ -181,17 +190,23 @@ exports.sohbaJoin = callable(async (req) => {
       ).length >= 10
     )
       throw new InputError("الحد الأقصى عشر صحبات نشطة");
-    if (c.memberCount >= 10 || dayIn(c.timeZone) > c.endDay)
+    if (c.memberCount >= (c.maxMembers || 10) || dayIn(c.timeZone) > c.endDay)
       throw new InputError("الصحبة مكتملة العدد أو انتهت");
-    const activity = d.activity || c.activity;
-    const target = goal(d.goal, activity);
+    const personal = c.allowPersonalGoals ?? c.schemaVersion !== 2;
+    const activity = personal ? d.activity || c.activity : c.activity;
+    const target = goal(
+      personal ? d.goal || c.sharedGoal || 1 : c.sharedGoal || 1,
+      activity,
+    );
     const member = {
       uid,
       name,
       activity,
       goal: target,
-      visible: d.visible === true,
+      visible: d.visible !== false,
       joinedAt: Date.now(),
+      alias: `رفيق ${c.nextMemberNumber || c.memberCount + 1}`,
+      nameVisible: true,
       reminderHour: 20,
       reminderMinute: 0,
       reminders: false,
@@ -199,13 +214,16 @@ exports.sohbaJoin = callable(async (req) => {
     };
     consume();
     tx.create(mref, member);
-    tx.create(ref.collection("companions").doc(uid), publicMember(member));
+    tx.create(ref.collection("companions").doc(uid), projection(member, c));
     tx.set(db.doc(`sohbaAccounts/${uid}/circles/${ref.id}`), {
       circleId: ref.id,
       name: c.name,
       endDay: c.endDay,
     });
-    tx.update(ref, { memberCount: c.memberCount + 1 });
+    tx.update(ref, {
+      memberCount: c.memberCount + 1,
+      nextMemberNumber: (c.nextMemberNumber || c.memberCount + 1) + 1,
+    });
     return { circleId: ref.id };
   });
 });
@@ -224,8 +242,9 @@ exports.sohbaCheckin = callable(async (req) => {
       day = dayIn(c.timeZone);
     if (day < c.startDay || day > c.endDay || d.day !== day)
       throw new InputError("يمكن تحديث تقدم اليوم فقط خلال الرحلة");
-    const done = completion(m, d.pages, d.seconds),
-      privateRef = mref.collection("days").doc(day),
+    const record = entry(m, d),
+      done = record.done;
+    const privateRef = mref.collection("days").doc(day),
       old = await tx.get(privateRef),
       dayRef = ref.collection("days").doc(day),
       group = await tx.get(dayRef),
@@ -238,17 +257,11 @@ exports.sohbaCheckin = callable(async (req) => {
     );
     tx.set(privateRef, {
       day,
-      pages: d.pages,
-      seconds: d.seconds,
-      done,
+      ...record,
       updatedAt: Date.now(),
     });
     tx.set(dayRef, { day, completed: count });
-    tx.set(
-      pubRef,
-      { statuses: { [day]: m.visible ? done : null } },
-      { merge: true },
-    );
+    tx.set(pubRef, projection(m, c, { [day]: record }), { merge: true });
     return { done };
   });
 });
@@ -262,7 +275,9 @@ exports.sohbaPreferences = callable(async (req) => {
     if (!ms.exists)
       throw new HttpsError("permission-denied", "عضوية غير موجودة");
     const history = await tx.get(mref.collection("days"));
+    const circle = (await tx.get(ref)).data();
     const visible = d.visible === true;
+    const nameVisible = d.nameVisible !== false;
     const hour = d.reminderHour,
       minute = d.reminderMinute;
     if (
@@ -283,21 +298,20 @@ exports.sohbaPreferences = callable(async (req) => {
         : null;
     tx.update(mref, {
       visible,
+      nameVisible,
       reminders: d.reminders === true,
-      summary: d.summary === true,
+      summary: d.summary === true && circle.showGroupProgress !== false,
       reminderHour: hour,
       reminderMinute: minute,
       pushToken: token,
     });
     tx.set(
       ref.collection("companions").doc(uid),
-      {
-        visible,
-        statuses: Object.fromEntries(
-          history.docs.map((s) => [s.id, visible ? s.data().done : null]),
-        ),
-      },
-      { merge: true },
+      projection(
+        { ...ms.data(), visible, nameVisible },
+        circle,
+        Object.fromEntries(history.docs.map((s) => [s.id, s.data()])),
+      ),
     );
   });
   return { ok: true };
@@ -319,11 +333,81 @@ exports.sohbaEncourage = callable(async (req) => {
     if (old.exists && Date.now() - old.data().createdAt < 60000)
       throw new InputError("انتظر دقيقة قبل التشجيع مجددًا");
     tx.set(reaction, {
-      name: ms.data().name,
+      uid,
       message: d.message,
       day,
       createdAt: Date.now(),
     });
+    tx.update(ref, { feedUpdatedAt: Date.now() });
+  });
+  return { ok: true };
+});
+exports.sohbaFeed = callable(async (req) => {
+  const uid = uidOf(req),
+    ref = circleRef(idOf(req.data?.circleId));
+  if (!(await ref.collection("members").doc(uid).get()).exists)
+    throw new HttpsError("permission-denied", "عضوية غير موجودة");
+  const [feed, companions] = await Promise.all([
+    ref
+      .collection("encouragement")
+      .orderBy("createdAt", "desc")
+      .limit(20)
+      .get(),
+    ref.collection("companions").get(),
+  ]);
+  const names = Object.fromEntries(
+    companions.docs.map((s) => [s.id, s.data().name]),
+  );
+  return feed.docs.map((s) => {
+    const d = s.data(),
+      author = d.uid || s.id.split("_").slice(1).join("_");
+    return {
+      id: s.id,
+      name: names[author] || "رفيق",
+      message: d.message,
+      day: d.day,
+      createdAt: d.createdAt,
+    };
+  });
+});
+exports.sohbaUpdateCircle = callable(async (req) => {
+  const uid = uidOf(req),
+    d = req.data || {},
+    ref = circleRef(idOf(d.circleId)),
+    options = settings(d),
+    name = text(d.name);
+  await db.runTransaction(async (tx) => {
+    const cs = await tx.get(ref);
+    if (cs.data()?.ownerUid !== uid)
+      throw new HttpsError("permission-denied", "متاح لمنشئ الصحبة فقط");
+    const c = cs.data();
+    if (options.maxMembers < c.memberCount)
+      throw new InputError("الحد لا يمكن أن يكون أقل من عدد الأعضاء الحالي");
+    const members = await tx.get(ref.collection("members"));
+    const histories = await Promise.all(
+      members.docs.map((m) => tx.get(m.ref.collection("days"))),
+    );
+    const updated = {
+      ...c,
+      ...options,
+      allowPersonalGoals: c.allowPersonalGoals ?? c.schemaVersion !== 2,
+      name,
+    };
+    tx.update(ref, {
+      ...options,
+      allowPersonalGoals: updated.allowPersonalGoals,
+      name,
+    });
+    members.docs.forEach((m, i) =>
+      tx.set(
+        ref.collection("companions").doc(m.id),
+        projection(
+          m.data(),
+          updated,
+          Object.fromEntries(histories[i].docs.map((s) => [s.id, s.data()])),
+        ),
+      ),
+    );
   });
   return { ok: true };
 });
@@ -434,7 +518,8 @@ exports.sohbaReminders = onSchedule(
       const members = await circle.ref.collection("members").get();
       for (const mdoc of members.docs) {
         const m = mdoc.data();
-        if (!m.pushToken || (!m.reminders && !m.summary)) continue;
+        const summary = m.summary && c.showGroupProgress !== false;
+        if (!m.pushToken || (!m.reminders && !summary)) continue;
         const reminderDate = reminderDay(
           c.timeZone,
           m.reminderHour,
@@ -448,7 +533,7 @@ exports.sohbaReminders = onSchedule(
         )
           continue;
         const own = await mdoc.ref.collection("days").doc(reminderDate).get();
-        if (!m.summary && own.data()?.done) continue;
+        if (!summary && own.data()?.done) continue;
         const group = await circle.ref
           .collection("days")
           .doc(reminderDate)
@@ -467,7 +552,7 @@ exports.sohbaReminders = onSchedule(
             body: JSON.stringify({
               to: m.pushToken,
               title: `صحبة · ${c.name}`,
-              body: m.summary
+              body: summary
                 ? `أتمّ ${group.data()?.completed || 0} من ${c.memberCount} رفاق نيتهم ${reminderDate === day ? "اليوم" : `في ${reminderDate}`}. معًا نستمر.`
                 : "وردك اليوم ينتظرك، ولو بخطوة صغيرة.",
               sound: "default",

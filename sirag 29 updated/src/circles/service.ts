@@ -31,6 +31,9 @@ import { loadReportSources } from "../reports/reportStore";
 import { localDay } from "../habits/habitData";
 import {
   Activity,
+  CircleDraft,
+  CircleOptions,
+  progressForHabit,
   Circle,
   CircleDetail,
   Membership,
@@ -140,78 +143,71 @@ export const previewCircle = (code: string) =>
     "sohbaPreview",
     { code: inviteCode(code) },
   );
-export async function createCircle(data: {
-  name: string;
-  activity: Activity;
-  goal: number;
-  visible: boolean;
-  startDay: string;
-}) {
+export async function createCircle(data: CircleDraft) {
   const p = await loadProfile();
-  if (!p) throw new Error("أكمل ملفك الشخصي أولًا");
+
   return call<{ circleId: string; code: string }>("sohbaCreate", {
     ...data,
-    displayName: p.name,
+    displayName: p?.name || "رفيق",
     timeZone:
       Intl.DateTimeFormat().resolvedOptions().timeZone || "Africa/Cairo",
   });
 }
 export async function joinCircle(
   code: string,
-  goal: number,
-  visible: boolean,
-  activity: Activity,
+  goal?: number,
+  visible = true,
+  activity?: Activity,
 ) {
   const p = await loadProfile();
-  if (!p) throw new Error("أكمل ملفك الشخصي أولًا");
+
   return call<{ circleId: string }>("sohbaJoin", {
     code: inviteCode(code),
-    goal,
+    ...(goal !== undefined ? { goal } : {}),
     visible,
-    activity,
-    displayName: p.name,
+    ...(activity ? { activity } : {}),
+    displayName: p?.name || "رفيق",
   });
 }
 export async function loadCircle(id: string): Promise<CircleDetail> {
   const u = await ensureCircleUser(),
     base = doc(db, "sohbaCircles", id);
-  const [c, m, companions, days, mine, enc] = await Promise.all([
-    getDoc(base),
+  const c = await getDoc(base);
+  if (!c.exists()) throw new Error("الصحبة غير موجودة");
+  const [m, companions, days, mine, enc] = await Promise.all([
     getDoc(doc(base, "members", u.uid)),
     getDocs(collection(base, "companions")),
-    getDocs(collection(base, "days")),
+    c.data().showGroupProgress === false
+      ? Promise.resolve(null)
+      : getDocs(collection(base, "days")),
     getDocs(collection(base, "members", u.uid, "days")),
-    getDocs(
-      query(
-        collection(base, "encouragement"),
-        orderBy("createdAt", "desc"),
-        limit(20),
-      ),
-    ),
+    call<CircleDetail["encouragement"]>("sohbaFeed", { circleId: id }),
   ]);
   if (!c.exists() || !m.exists()) throw new Error("لم تعد عضوًا في هذه الصحبة");
   return {
     circle: { ...c.data(), id: c.id } as Circle,
     member: m.data() as Membership,
     companions: companions.docs.map((s) => s.data() as Companion),
-    days: Object.fromEntries(days.docs.map((s) => [s.id, s.data().completed])),
+    days: Object.fromEntries(
+      (days?.docs || []).map((s) => [s.id, s.data().completed]),
+    ),
     mine: Object.fromEntries(
       mine.docs.map((s) => [s.id, s.data() as PrivateDay]),
     ),
-    encouragement: enc.docs.map(
-      (s) =>
-        ({ ...s.data(), id: s.id }) as CircleDetail["encouragement"][number],
-    ),
+    encouragement: enc,
   };
 }
-export async function syncCircle(circle: Circle) {
-  if (!canSync(circle)) return false;
+export async function syncCircle(
+  circle: Circle,
+  memberActivity: Activity = circle.activity,
+) {
+  if (!canSync(circle) || memberActivity === "custom") return false;
   const day = circleDay(circle.timeZone),
     source = await loadReportSources([localDay()]);
   await call("sohbaCheckin", {
     circleId: circle.id,
     day,
-    ...canonicalProgress(source.readDays, source.listening[day], day),
+    ...progressForHabit(memberActivity, source, day),
   });
   return true;
 }
@@ -219,6 +215,7 @@ export function watchCircle(
   id: string,
   refresh: () => void,
   onError: (e: Error) => void,
+  showGroupProgress = true,
 ) {
   const base = doc(db, "sohbaCircles", id);
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -228,7 +225,7 @@ export function watchCircle(
   };
   const subscriptions = [
     onSnapshot(base, changed, onError),
-    ...["companions", "days", "encouragement"].map((name) =>
+    ...["companions", ...(showGroupProgress ? ["days"] : [])].map((name) =>
       onSnapshot(collection(base, name), changed, onError),
     ),
   ];
@@ -280,3 +277,10 @@ export function friendlyError(error: any) {
     "تعذّر إتمام العملية. حاول مجددًا."
   );
 }
+
+export const updateCircle = (
+  circleId: string,
+  settings: CircleOptions & { name: string },
+) => call("sohbaUpdateCircle", { circleId, ...settings });
+export const manualCheckin = (circleId: string, day: string, value: number) =>
+  call("sohbaCheckin", { circleId, day, value });

@@ -54,6 +54,7 @@ test(
     ]);
     const created = await call(owner, "sohbaCreate", {
       name: "صحبة الاختبار",
+      allowPersonalGoals: true,
       displayName: "أحمد",
       activity: "reading",
       goal: 2,

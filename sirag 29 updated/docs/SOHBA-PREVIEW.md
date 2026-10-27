@@ -1,17 +1,21 @@
-# صحبة · screen preview
+# صحبة · no-email creation and joining
 
-These are browser captures of the implemented React Native screens at a phone viewport. The preview uses an injected test service and sample member data, **not a deployed Firebase database**. The night/dawn themes follow the app's saved appearance preference. Native spacing and system dialogs still need phone testing.
+Browser captures of the implemented React Native screens at a phone viewport. They use an injected test service and sample data, **not a deployed Firebase database**. Real native appearance, notifications and OS link verification still need phone testing.
 
 | Night | Dawn |
 | --- | --- |
-| ![Night circle entry](screenshots/sohba-night.png) | ![Dawn circle entry](screenshots/sohba-dawn.png) |
+| ![Night circle entry, email optional](screenshots/sohba-night.png) | ![Dawn circle entry, email optional](screenshots/sohba-dawn.png) |
 
-| Personal journey | Calendar and companions |
+| Create: capacity, habit, goal and end date | Creator's independent privacy controls |
 | --- | --- |
-| ![Journey progress](screenshots/sohba-journey.png) | ![Circle companions](screenshots/sohba-companions.png) |
+| ![Customizable circle creation](screenshots/sohba-create.png) | ![Creator privacy settings](screenshots/sohba-companions.png) |
 
-| Invitation | Join preview |
+| Circle with aggregate progress hidden | Join using only a code |
 | --- | --- |
-| ![Invitation](screenshots/sohba-invite.png) | ![Join preview](screenshots/sohba-join.png) |
+| ![Private circle progress](screenshots/sohba-journey.png) | ![Code-only join](screenshots/sohba-join.png) |
 
-The screens include create/join, recoverable email accounts, personal goals, a seven-day calendar, live progress subscriptions, encouragement, privacy, reminders, reporting and membership management. Live multi-device use needs the [Firebase activation steps](SOHBA.md).
+![Invitation to a configurable habit circle](screenshots/sohba-invite.png)
+
+Creators choose 2–30 members, 1–90 days, a habit and target, name visibility, aggregate/individual progress and whether to show completed or pending members. Invitation routes join automatically; code entry needs one button. Email linking is an optional recovery action.
+
+[Firebase activation, native links, privacy and validation](SOHBA.md).
