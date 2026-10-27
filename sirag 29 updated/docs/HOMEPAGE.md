@@ -39,6 +39,10 @@ This release redesigns the homepage and adds shared appearance preferences. Exis
 
 ## Validation
 
+### iPhone startup correction
+
+If Expo Go reports `Component auth has not been registered yet`, use the updated download containing `metro.config.js`. It makes Firebase 9's native Auth and app entry points share one registry. After installing dependencies, restart with `npx expo start --clear` and scan the new QR code. The corrected iOS and Android export source maps were checked for exactly one Firebase app registry and the native Auth entry.
+
 - TypeScript and all 54 existing unit/regression tests pass.
 - Full iOS, Android and web exports pass.
 - Browser checks cover both modes, persistent settings after reload, live system-theme changes, Arabic-number habit additions/corrections, city selection, Quran/report navigation, and 320/375/768-pixel layouts.
