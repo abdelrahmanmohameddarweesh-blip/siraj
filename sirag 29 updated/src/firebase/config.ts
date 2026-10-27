@@ -2,7 +2,7 @@
 export const firebaseConfig = {
   apiKey:
     process.env.EXPO_PUBLIC_FIREBASE_API_KEY ||
-    "AIzaSyB6IDKIRy9ghnUQtLT03kJK1rzW79-AkOc",
+    "AIzaSyB6IDKIRy9ghnUQtlTO3kJKlrzW79-Ak0c",
   authDomain:
     process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN ||
     "batal-moslem.firebaseapp.com",
@@ -15,4 +15,5 @@ export const firebaseConfig = {
   appId:
     process.env.EXPO_PUBLIC_FIREBASE_APP_ID ||
     "1:39970984319:web:7fe3c89e912c2d7d434a4a",
+  measurementId: "G-0NW6XMNHX8",
 };
