@@ -596,6 +596,17 @@ export default function SiragHome({ navigation }: any) {
           </View>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="صحبة · رحلتك أجمل مع صحبة"
+            onPress={() => open("Sohba")}
+            style={{ backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: 24, padding: 24, gap: 12, marginTop: 20 }}
+          >
+            <Text style={{ fontFamily: "PlexMedium", color: palette.accent, textAlign: "right", fontSize: 12 }}>صحبة القرآن · سبعة أيام معًا</Text>
+            <Text style={{ fontFamily: "Ruqaa", color: palette.text, textAlign: "right", fontSize: 30 }}>رحلتك أجمل مع صحبة</Text>
+            <Text style={{ fontFamily: "Plex", color: palette.secondary, textAlign: "right", lineHeight: 24 }}>ورد يناسبك، ورفاق يشجّعونك. ابدأ رحلة مع أهلك وأصدقائك أو انضم برمز دعوتهم.</Text>
+            <Text style={{ fontFamily: "PlexBold", color: palette.accent, textAlign: "right" }}>ابدأ صحبتك أو انضم لرفاقك ←</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
             accessibilityLabel="ادخل واحتك"
             onPress={() => open("Oasis")}
             style={s.oasisCard}

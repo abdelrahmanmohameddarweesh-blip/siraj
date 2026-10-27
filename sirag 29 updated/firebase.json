@@ -1,3 +1,30 @@
 {
-  "firestore": { "rules": "firestore.rules" }
+  "firestore": { "rules": "firestore.rules" },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "sohba",
+      "ignore": ["node_modules", "test", "*.log"]
+    }
+  ],
+  "hosting": {
+    "public": "invitation-site",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Content-Type-Options", "value": "nosniff" },
+          { "key": "Referrer-Policy", "value": "no-referrer" }
+        ]
+      }
+    ]
+  },
+  "emulators": {
+    "auth": { "port": 9099 },
+    "firestore": { "port": 8080 },
+    "functions": { "port": 5001 },
+    "ui": { "enabled": false },
+    "singleProjectMode": true
+  }
 }

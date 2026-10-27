@@ -11,6 +11,8 @@ import { useNotificationRouter } from './notifications/NotificationRouter';
 import PrayerRemindersScreen from './notifications/PrayerRemindersScreen';
 import ProfileSetupScreen from './profile/ProfileSetupScreen';
 import InsightsScreen from './reports/InsightsScreen';
+import SohbaScreen from './circles/SohbaScreen';
+import { useInvitationRouter } from './circles/InvitationRouter';
 import SiragHome from './screens/SiragHome';
 import SandWorldScreen from './screens/SandWorldScreen';
 import HabitLibraryScreen from './habits/HabitLibraryScreen';
@@ -24,7 +26,7 @@ import OasisSplash from './oasis/OasisSplash';
 const Stack = createNativeStackNavigator();
 const navRef = createNavigationContainerRef<any>();
 const theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: '#082B2A' } };
-function NotificationRouter() { useNotificationRouter(navRef); return null; }
+function NotificationRouter() { useNotificationRouter(navRef); useInvitationRouter(navRef); return null; }
 
 export default function SiragApp() {
   const [fontsReady, fontError] = useFonts({
@@ -43,6 +45,7 @@ export default function SiragApp() {
         <Stack.Screen name="Splash" component={OasisSplash} />
         <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} options={{ presentation: 'transparentModal', animation: 'fade', gestureEnabled: false }} />
         <Stack.Screen name="Home" component={SiragHome} />
+        <Stack.Screen name="Sohba" component={SohbaScreen} />
         <Stack.Screen name="HabitSetup" component={HabitLibraryScreen} />
         <Stack.Screen name="PrayerReminders" component={PrayerRemindersScreen} />
         <Stack.Screen name="QuranReader" component={QuranReaderScreen} />

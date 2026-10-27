@@ -27,6 +27,40 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Sohba writes go through authenticated callable functions, never clients.
+    function circleMember(circleId) {
+      return request.auth != null && exists(/databases/$(database)/documents/sohbaCircles/$(circleId)/members/$(request.auth.uid));
+    }
+    match /sohbaAccounts/{uid}/circles/{circleId} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
+    }
+    match /sohbaCircles/{circleId} {
+      allow read: if circleMember(circleId);
+      allow write: if false;
+      match /members/{uid} {
+        // Even the creator cannot read someone else's goals, tokens or amounts.
+        allow read: if circleMember(circleId) && request.auth.uid == uid;
+        allow write: if false;
+        match /days/{day} {
+          allow read: if circleMember(circleId) && request.auth.uid == uid;
+          allow write: if false;
+        }
+      }
+      match /companions/{uid} {
+        allow read: if circleMember(circleId);
+        allow write: if false;
+      }
+      match /days/{day} {
+        allow read: if circleMember(circleId);
+        allow write: if false;
+      }
+      match /encouragement/{id} {
+        allow read: if circleMember(circleId);
+        allow write: if false;
+      }
+    }
+
     // Public / Global Leaderboards
     // Anyone authenticated can read; updates restricted to matching user
     match /leaderboard/{entry} {

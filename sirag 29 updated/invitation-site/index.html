@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#082b2a" />
+    <title>دعوة إلى صحبة · سراج</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #061c1d;
+        color: #f7efdc;
+        font-family: system-ui, sans-serif;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background-image: radial-gradient(
+          ellipse at top,
+          #244e40,
+          transparent 65%
+        );
+      }
+      main {
+        width: 100%;
+        max-width: 460px;
+        padding: 36px 28px;
+        border: 1px solid #385347;
+        border-radius: 32px;
+        background: linear-gradient(150deg, #143a34, #092625);
+        box-shadow: 0 30px 100px #0005;
+        text-align: center;
+      }
+      small {
+        color: #e3c58d;
+        letter-spacing: 2px;
+      }
+      h1 {
+        font-family: serif;
+        font-size: 56px;
+        color: #e3c58d;
+        margin: 16px;
+      }
+      h2 {
+        font-size: 25px;
+      }
+      p {
+        line-height: 1.9;
+        color: #b7cabb;
+      }
+      #code {
+        font-size: 25px;
+        letter-spacing: 3px;
+        background: #061c1d;
+        padding: 20px;
+        border-radius: 16px;
+        direction: ltr;
+      }
+      button,
+      a {
+        display: block;
+        width: 100%;
+        border: 0;
+        border-radius: 14px;
+        padding: 16px;
+        font: inherit;
+        font-weight: 700;
+        margin-top: 12px;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      button {
+        background: #e3c58d;
+        color: #17372d;
+      }
+      a {
+        color: #e3c58d;
+        border: 1px solid #385347;
+      }
+      #status {
+        font-size: 13px;
+      }
+      footer {
+        margin-top: 24px;
+        font-size: 12px;
+        color: #9bb3a3;
+      }
+      a[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <small>نُورٌ يَنْمُو مَعَك</small>
+      <h1>سراج</h1>
+      <h2>رحلتك أجمل مع صحبة</h2>
+      <p>
+        دعاك أحد رفاقك إلى سبعة أيام مع القرآن.<br />هدف يناسبك، وصحبة تشجّعك.
+      </p>
+      <div id="code" aria-label="رمز الانضمام"></div>
+      <button id="copy">انسخ رمز الدعوة</button
+      ><a id="open" href="#">افتح الدعوة في سراج</a
+      ><a id="ios" hidden>تحميل لأجهزة iPhone</a
+      ><a id="android" hidden>تحميل لأجهزة Android</a>
+      <p id="status" role="status">
+        بعد تثبيت سراج، افتح «صحبة» واختر «انضم برمز». إذا كنت تختبر نسخة Expo
+        Go، أدخل الرمز داخلها.
+      </p>
+      <footer>
+        تبقى تفاصيل الصحبة خاصة بأعضائها.<br />إذا لم تكن لديك نسخة التطبيق،
+        اطلبها من صاحب الدعوة.
+      </footer>
+    </main>
+    <script src="config.js"></script>
+    <script>
+      const code = (
+        new URL(location.href).searchParams.get("code") || ""
+      ).toUpperCase();
+      const valid = /^[A-F0-9]{12}$/.test(code);
+      document.getElementById("code").textContent = valid
+        ? code
+        : "دعوة غير صالحة";
+      const copy = document.getElementById("copy"),
+        open = document.getElementById("open");
+      copy.disabled = !valid;
+      open.hidden = !valid;
+      if (valid) {
+        open.href = "sirag://sohba?code=" + code;
+        copy.onclick = async () => {
+          try {
+            await navigator.clipboard.writeText(code);
+            document.getElementById("status").textContent =
+              "تم نسخ الرمز. افتح سراج ثم صحبة ← انضم برمز.";
+          } catch {
+            document.getElementById("status").textContent =
+              "يمكنك تحديد الرمز ونسخه يدويًا.";
+          }
+        };
+      }
+      for (const platform of ["ios", "android"]) {
+        const url = window.SIRAJ_INSTALL?.[platform];
+        if (
+          url &&
+          /^https:\/\/(apps\.apple\.com|play\.google\.com)\//.test(url)
+        ) {
+          const link = document.getElementById(platform);
+          link.href = url;
+          link.hidden = false;
+          link.rel = "noopener";
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -107,3 +107,7 @@ npm start
 export PATH="$HOME/.local/node/bin:$PATH"
 npx tsc --noEmit
 ```
+
+## صحبة · private Quran journeys
+
+The homepage now includes **صحبة**: seven-day reading/listening circles, invitation codes, private goals, encouragement, progress and reminders. See [feature details and Firebase activation](docs/SOHBA.md). Live sharing requires deployment of the included Firebase backend; reminder delivery requires a native build.
