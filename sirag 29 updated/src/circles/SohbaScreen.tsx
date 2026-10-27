@@ -105,6 +105,7 @@ export default function SohbaScreen({
     [summary, setSummary] = useState(false),
     [hour, setHour] = useState("20"),
     [minute, setMinute] = useState("00");
+  const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
   const mounted = useRef(true),
     locked = useRef(false),
     autoCode = useRef("");
@@ -124,7 +125,13 @@ export default function SohbaScreen({
       try {
         await work();
       } catch (e) {
-        if (mounted.current) setError(api.friendlyError(e));
+        if (mounted.current) {
+          const message = api.friendlyError(e);
+          setError(message);
+          scrollRef.current?.scrollTo({ y: 0, animated: true });
+          if (Platform.OS !== "web")
+            Alert.alert("تعذّر إتمام العملية", message, [{ text: "حسنًا" }]);
+        }
       } finally {
         locked.current = false;
         if (mounted.current) setBusy(false);
@@ -372,7 +379,7 @@ export default function SohbaScreen({
         ]}
       >
         <Text style={[s.buttonText, secondary && { color: p.text }]}>
-          {label}
+          {busy && !secondary ? "جارٍ التنفيذ…" : label}
         </Text>
       </Pressable>
     );
@@ -470,6 +477,7 @@ export default function SohbaScreen({
         <Text style={s.heading}>{title}</Text>
       </View>
       <ScrollView
+        ref={scrollRef}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={[
           s.content,

@@ -244,39 +244,7 @@ export const leaveCircle = (circleId: string, memberUid?: string) =>
   call("sohbaLeave", { circleId, ...(memberUid ? { memberUid } : {}) });
 export const reportCircle = (circleId: string, reason: string) =>
   call("sohbaReport", { circleId, reason });
-export function friendlyError(error: any) {
-  const code = error?.code || "";
-  if (code.includes("not-found") && /الدعوة|الصحبة/.test(error?.message || ""))
-    return error.message;
-  if (
-    code.includes("unavailable") ||
-    code.includes("not-found") ||
-    code.includes("internal")
-  )
-    return "تعذّر الاتصال بخدمة الصحبة. تحقق من الإنترنت وتفعيل خدمة صحبة في Firebase.";
-  if (code.includes("permission-denied"))
-    return "هذه الصحبة خاصة بأعضائها. تحقق من حسابك وإعدادات Firebase.";
-  if (code.includes("operation-not-allowed"))
-    return "يلزم تفعيل تسجيل الدخول بالبريد والمجهول في Firebase.";
-  if (
-    code.includes("email-already-in-use") ||
-    code.includes("credential-already-in-use")
-  )
-    return "هذا البريد مسجل بالفعل. اختر «لدي حساب» لتسجيل الدخول.";
-  if (
-    code.includes("invalid-credential") ||
-    code.includes("wrong-password") ||
-    code.includes("user-not-found")
-  )
-    return "تحقق من البريد الإلكتروني وكلمة المرور.";
-  if (code.includes("invalid-email")) return "اكتب بريدًا إلكترونيًا صالحًا.";
-  if (code.includes("too-many-requests"))
-    return "محاولات كثيرة. حاول مرة أخرى لاحقًا.";
-  return (
-    error?.message?.replace(/^Firebase:\s*/, "") ||
-    "تعذّر إتمام العملية. حاول مجددًا."
-  );
-}
+export { friendlyError } from "./errors";
 
 export const updateCircle = (
   circleId: string,

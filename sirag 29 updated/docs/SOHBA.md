@@ -95,3 +95,11 @@ npx firebase-tools emulators:exec --project demo-siraj --only auth,firestore,fun
 `EXPO_PUBLIC_FIREBASE_EMULATOR_HOST` switches the app to `demo-siraj` and local emulators; leave it unset for normal builds. Use your machine's LAN IP and bind emulator hosts appropriately for physical-phone testing on a trusted network.
 
 [View the screen gallery](SOHBA-PREVIEW.md).
+
+## `auth/api-key-not-valid` while creating a circle
+
+This is a Firebase app configuration failure, not a missing email/password. The original project's bundled key can be rejected if it was deleted, replaced, belongs to another project, or has unsuitable API/app restrictions. A new valid key cannot be guessed or repaired in app code.
+
+The owner should open Firebase Console → batal-moslem → Project settings → General → Your apps → Web app → SDK setup and configuration → Config. Supply that current **public web app configuration** as a matching set. Do not supply a service-account JSON, password or private key. It can replace `src/firebase/config.ts` or be provided with the `EXPO_PUBLIC_FIREBASE_*` variables in `.env.example`; restart Expo with `--clear` after changing it. Then confirm Anonymous Auth is enabled and deploy the included backend/rules. A valid key alone does not deploy the circle service.
+
+Failed actions now scroll back to their error and show a native alert. The primary button displays a busy label while awaiting the service. No circle is claimed to exist when authentication fails.
