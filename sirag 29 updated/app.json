@@ -63,6 +63,12 @@
       ]
     ],
     "scheme": "sirag",
-    "icon": "./assets/store/icon.png"
+    "icon": "./assets/store/icon.png",
+    "owner": "darweesh",
+    "extra": {
+      "eas": {
+        "projectId": "81f1357d-c55c-49b1-bec8-e251d6143ce2"
+      }
+    }
   }
 }
