@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Sirag | سراج",
+    "name": "Siraj | سراج",
     "slug": "sirag",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "platforms": [
       "ios",
@@ -23,6 +23,22 @@
       "permissions": [
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.SCHEDULE_EXACT_ALARM"
+      ],
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/store/icon.png",
+        "backgroundColor": "#082B2A"
+      },
+      "blockedPermissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACTIVITY_RECOGNITION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_MEDIA_VIDEO",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "com.google.android.gms.permission.AD_ID"
       ]
     },
     "plugins": [
@@ -31,7 +47,9 @@
       [
         "expo-audio",
         {
-          "enableBackgroundPlayback": true
+          "enableBackgroundPlayback": true,
+          "recordAudioAndroid": false,
+          "microphonePermission": false
         }
       ],
       [
@@ -44,6 +62,7 @@
         }
       ]
     ],
-    "scheme": "sirag"
+    "scheme": "sirag",
+    "icon": "./assets/store/icon.png"
   }
 }

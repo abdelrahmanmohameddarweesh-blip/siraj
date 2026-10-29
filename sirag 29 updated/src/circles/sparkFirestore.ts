@@ -163,3 +163,7 @@ export function watchDetail(
     invalidate(id);
   };
 }
+
+export function clearCircleCache() {
+  cache.clear();
+}

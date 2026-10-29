@@ -1,36 +1,68 @@
-import { doc, getFirestore, serverTimestamp, setDoc } from 'firebase/firestore';
-import app from '../firebase/init';
-import { ensureAuthenticatedUser } from './cloudIdentity';
-import { PersonalProfile, Gender, profileError } from './profileModel';
-import { readJSON, updateJSON } from '../storage/jsonStore';
+import { doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore";
+import app from "../firebase/init";
+import { ensureAuthenticatedUser } from "./cloudIdentity";
+import { PersonalProfile, Gender, profileError } from "./profileModel";
+import { readJSON, updateJSON } from "../storage/jsonStore";
+import { accountSyncBlocked } from "../account/maintenance";
 
-export const PROFILE_KEY = 'sirag-personal-profile-v1';
-export const loadProfile = () => readJSON<PersonalProfile | null>(PROFILE_KEY, null);
+export const PROFILE_KEY = "sirag-personal-profile-v1";
+export const loadProfile = () =>
+  readJSON<PersonalProfile | null>(PROFILE_KEY, null);
 export async function saveProfile(name: string, gender: Gender) {
   const error = profileError(name, gender);
   if (error) throw new Error(error);
   const now = new Date().toISOString();
-  const profile = await updateJSON<PersonalProfile | null>(PROFILE_KEY, null, previous => ({
-    name: name.trim(), gender, createdAt: previous?.createdAt || now, updatedAt: now,
-    ...(previous?.cloudUid ? { cloudUid: previous.cloudUid } : {}),
-  }));
+  const profile = await updateJSON<PersonalProfile | null>(
+    PROFILE_KEY,
+    null,
+    (previous) => ({
+      name: name.trim(),
+      gender,
+      createdAt: previous?.createdAt || now,
+      updatedAt: now,
+      ...(previous?.cloudUid ? { cloudUid: previous.cloudUid } : {}),
+    }),
+  );
   return profile!;
 }
 let syncing: Promise<boolean> | null = null;
 export function syncProfile(): Promise<boolean> {
   if (syncing) return syncing;
   syncing = (async () => {
+    if (await accountSyncBlocked()) return false;
     const profile = await loadProfile();
     if (!profile) return false;
     if (profile.syncedAt && profile.syncedAt >= profile.updatedAt) return true;
     const user = await ensureAuthenticatedUser();
-    if (profile.cloudUid && profile.cloudUid !== user.uid) throw new Error('profile/identity-mismatch');
-    await setDoc(doc(getFirestore(app), 'privateProfiles', user.uid), {
-      displayName: profile.name, gender: profile.gender, createdAt: profile.createdAt,
-      profileUpdatedAt: profile.updatedAt, updatedAt: serverTimestamp(),
-    }, { merge: true });
-    await updateJSON<PersonalProfile | null>(PROFILE_KEY, null, current => !current || current.updatedAt !== profile.updatedAt ? current : ({ ...current, cloudUid: user.uid, syncedAt: new Date().toISOString() }));
+    if (profile.cloudUid && profile.cloudUid !== user.uid)
+      throw new Error("profile/identity-mismatch");
+    await setDoc(
+      doc(getFirestore(app), "privateProfiles", user.uid),
+      {
+        displayName: profile.name,
+        gender: profile.gender,
+        createdAt: profile.createdAt,
+        profileUpdatedAt: profile.updatedAt,
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+    await updateJSON<PersonalProfile | null>(PROFILE_KEY, null, (current) =>
+      !current || current.updatedAt !== profile.updatedAt
+        ? current
+        : {
+            ...current,
+            cloudUid: user.uid,
+            syncedAt: new Date().toISOString(),
+          },
+    );
     return true;
-  })().finally(() => { syncing = null; });
+  })().finally(() => {
+    syncing = null;
+  });
   return syncing;
+}
+
+export async function waitForProfileSync() {
+  if (syncing) await syncing.catch(() => false);
 }

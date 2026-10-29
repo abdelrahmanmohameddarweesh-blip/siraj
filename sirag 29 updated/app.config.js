@@ -16,6 +16,17 @@ function adAppId(value, fallback) {
 }
 module.exports = {
   ...expo,
+  extra: {
+    ...expo.extra,
+    ...(process.env.EXPO_PUBLIC_EAS_PROJECT_ID
+      ? {
+          eas: {
+            ...expo.extra?.eas,
+            projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID,
+          },
+        }
+      : {}),
+  },
   plugins: [
     ...(expo.plugins || []),
     [

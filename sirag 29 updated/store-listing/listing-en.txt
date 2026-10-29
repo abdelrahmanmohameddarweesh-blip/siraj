@@ -1,0 +1,32 @@
+APP NAME
+Siraj | سراج
+
+SHORT DESCRIPTION
+Quran, prayer reminders and daily habits in a peaceful growing oasis.
+
+FULL DESCRIPTION — DRAFT FOR OWNER REVIEW
+Build a gentle daily routine with Siraj.
+
+Keep your Quran, prayer, Athkar and memorization habits together in a calm Arabic interface. Choose Night or Dawn appearance and let your oasis reflect the steps you record.
+
+• Prayer times calculated for your selected city and method, with configurable local reminders and personal check-ins.
+• Quran reading and listening, with confirmed-page and playback tracking.
+• Morning and evening Athkar sessions.
+• Memorization and review tools.
+• Personal habit goals and detailed activity reports.
+• A growing oasis with seeds, water and plants earned from recorded habits.
+
+Reading, prayer and habit completion are personal records, not an independent verification of worship. Notification delivery depends on device permissions, Focus/battery settings and operating-system behavior. Some Quran text and audio sources require an internet connection.
+
+The public-release feature set and children's privacy controls must be confirmed before this draft is submitted. Do not claim online circle sharing or live advertising is available in a family-local release.
+
+SUPPORT
+abdelrahman.mohamed.darweesh@gmail.com
+
+CATEGORY SUGGESTION
+Lifestyle — confirm in Play Console.
+
+PLANNED PUBLIC URLS — ONLY AFTER HOSTING DEPLOYMENT
+Privacy: https://batal-moslem.web.app/privacy
+Deletion: https://batal-moslem.web.app/delete-account
+Support: https://batal-moslem.web.app/support

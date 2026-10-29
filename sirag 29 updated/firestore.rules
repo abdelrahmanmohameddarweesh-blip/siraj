@@ -12,7 +12,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create, update: if request.auth != null && request.auth.uid == userId;
-      allow delete: if false; // prevent accidental account wipe via client SDK
+      allow delete: if request.auth != null && request.auth.uid == userId; // explicit account deletion
     }
 
     // Personal onboarding data: private to its authenticated owner.
@@ -24,7 +24,7 @@ service cloud.firestore {
         && request.resource.data.displayName.size() >= 2
         && request.resource.data.displayName.size() <= 50
         && request.resource.data.gender in ['male', 'female'];
-      allow delete: if false;
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
 
     // Spark-only circles. Client transactions + rules replace paid Functions.
@@ -96,7 +96,8 @@ service cloud.firestore {
       allow update: if signed() && optionsValid(request.resource.data) && request.resource.data.memberCount == request.resource.data.members.size() && (
         joinValid(cid, resource.data, request.resource.data) || removalValid(cid, resource.data, request.resource.data) ||
         (owns(cid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','maxMembers','showNames','showGroupProgress','showMemberProgress','showCompletedMembers','showPendingMembers'])) ||
-        (owns(cid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['inviteVersion']) && request.resource.data.inviteVersion == resource.data.inviteVersion + 1));
+        (owns(cid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['inviteVersion']) && request.resource.data.inviteVersion == resource.data.inviteVersion + 1) ||
+        (resource.data.lastRemovedUid == request.auth.uid && request.resource.data.lastRemovedUid == '' && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastRemovedUid'])));
       allow delete: if signed() && resource.data.members.keys().hasOnly([request.auth.uid]) && resource.data.members.size() == 1 && !existsAfter(/databases/$(database)/documents/sparkCircles/$(cid)/members/$(request.auth.uid));
       match /members/{uid} {
         allow get: if signed() && request.auth.uid == uid;
@@ -214,7 +215,8 @@ service cloud.firestore {
       allow create: if signed() && memberOf(request.resource.data.circleId)
         && request.resource.data.keys().hasOnly(['circleId','uid','reason','createdAt']) && request.resource.data.uid == request.auth.uid
         && validText(request.resource.data.reason,500);
-      allow read, update, delete: if false;
+      allow read, delete: if signed() && resource.data.uid == request.auth.uid;
+      allow update: if false;
     }
 
     // Public / Global Leaderboards

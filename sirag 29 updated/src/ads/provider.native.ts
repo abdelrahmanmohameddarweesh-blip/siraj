@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import adConfig from "../../ads.config.json";
+import release from "../../release.config.json";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import type { AdSupport, AdResult } from "./providerTypes";
 import { runRewardedLifecycle } from "./adLifecycle";
@@ -40,6 +41,13 @@ export function adSupport(): AdSupport {
       message:
         "الإعلانات غير مفعّلة في هذه النسخة. واصل زراعتك ومكافآت عاداتك كالمعتاد.",
     };
+  if (!test && !release.liveAdsApproved)
+    return {
+      available: false,
+      test,
+      message:
+        "الإعلانات الحية موقوفة حتى اكتمال إعدادات إصدار العائلة وخصوصية الأطفال.",
+    };
   if (
     !test &&
     (!/^ca-app-pub-\d+\/\d+$/.test(liveUnit || "") ||
@@ -73,7 +81,13 @@ export function adSupport(): AdSupport {
 async function initialize() {
   const s = getSdk();
   // Refresh the required regional consent flow on each user-initiated request.
-  await s.AdsConsent.gatherConsent();
+  await s.default().setRequestConfiguration({
+    maxAdContentRating: s.MaxAdContentRating.G,
+    ageRestrictedTreatment: s.AgeRestrictedTreatment.CHILD,
+    tagForUnderAgeOfConsent: true,
+    publisherPrivacyPersonalizationState: "disabled",
+  });
+  await s.AdsConsent.gatherConsent({ tagForUnderAgeOfConsent: true });
   const consent = await s.AdsConsent.getConsentInfo();
   if (!consent.canRequestAds)
     throw new Error(
@@ -130,7 +144,7 @@ export async function adPrivacyOptions() {
   const support = adSupport();
   if (!support.available) throw new Error(support.message);
   const s = getSdk();
-  await s.AdsConsent.requestInfoUpdate();
+  await s.AdsConsent.requestInfoUpdate({ tagForUnderAgeOfConsent: true });
   const info = await s.AdsConsent.getConsentInfo();
   if (
     info.privacyOptionsRequirementStatus ===

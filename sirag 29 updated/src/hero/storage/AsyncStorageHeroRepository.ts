@@ -31,6 +31,8 @@ const STORAGE_KEYS = {
 export class AsyncStorageHeroRepository implements IHeroRepository {
   private memoryEventsCache: HeroEvent[] | null = null;
 
+  clearMemoryCache(){this.memoryEventsCache=null;}
+
   async getUser(uid: string): Promise<HeroProfile | null> {
     try {
       const users = await this.readUsersMap();
@@ -308,3 +310,5 @@ export class AsyncStorageHeroRepository implements IHeroRepository {
 }
 
 export const heroRepository: IHeroRepository = new AsyncStorageHeroRepository();
+
+export function clearHeroMemoryCache(){(heroRepository as AsyncStorageHeroRepository).clearMemoryCache();}

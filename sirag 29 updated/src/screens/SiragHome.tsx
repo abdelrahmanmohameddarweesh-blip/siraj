@@ -598,12 +598,56 @@ export default function SiragHome({ navigation }: any) {
             accessibilityRole="button"
             accessibilityLabel="صحبة · رحلتك أجمل مع صحبة"
             onPress={() => open("Sohba")}
-            style={{ backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.border, borderRadius: 24, padding: 24, gap: 12, marginTop: 20 }}
+            style={{
+              backgroundColor: palette.surface,
+              borderWidth: 1,
+              borderColor: palette.border,
+              borderRadius: 24,
+              padding: 24,
+              gap: 12,
+              marginTop: 20,
+            }}
           >
-            <Text style={{ fontFamily: "PlexMedium", color: palette.accent, textAlign: "right", fontSize: 12 }}>صحبة · عادات تجمعنا</Text>
-            <Text style={{ fontFamily: "Ruqaa", color: palette.text, textAlign: "right", fontSize: 30 }}>رحلتك أجمل مع صحبة</Text>
-            <Text style={{ fontFamily: "Plex", color: palette.secondary, textAlign: "right", lineHeight: 24 }}>اختر عادتك ومدتك وخصوصيتك. ابدأ صحبة مع أهلك وأصدقائك أو انضم برمز دعوتهم، دون بريد إلكتروني.</Text>
-            <Text style={{ fontFamily: "PlexBold", color: palette.accent, textAlign: "right" }}>ابدأ صحبتك أو انضم لرفاقك ←</Text>
+            <Text
+              style={{
+                fontFamily: "PlexMedium",
+                color: palette.accent,
+                textAlign: "right",
+                fontSize: 12,
+              }}
+            >
+              صحبة · عادات تجمعنا
+            </Text>
+            <Text
+              style={{
+                fontFamily: "Ruqaa",
+                color: palette.text,
+                textAlign: "right",
+                fontSize: 30,
+              }}
+            >
+              رحلتك أجمل مع صحبة
+            </Text>
+            <Text
+              style={{
+                fontFamily: "Plex",
+                color: palette.secondary,
+                textAlign: "right",
+                lineHeight: 24,
+              }}
+            >
+              اختر عادتك ومدتك وخصوصيتك. ابدأ صحبة مع أهلك وأصدقائك أو انضم برمز
+              دعوتهم، دون بريد إلكتروني.
+            </Text>
+            <Text
+              style={{
+                fontFamily: "PlexBold",
+                color: palette.accent,
+                textAlign: "right",
+              }}
+            >
+              ابدأ صحبتك أو انضم لرفاقك ←
+            </Text>
           </Pressable>
           <Pressable
             accessibilityRole="button"
@@ -724,6 +768,20 @@ export default function SiragHome({ navigation }: any) {
                 >
                   <SirajIcon name="user" color={palette.accent} />
                   <Text style={s.habitName}>تعديل الاسم والملف الشخصي</Text>
+                  <SirajIcon name="arrow" color={palette.accent} />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  style={s.sheetButton}
+                  onPress={() => {
+                    setModal(null);
+                    open("Account");
+                  }}
+                >
+                  <SirajIcon name="user" color={palette.accent} />
+                  <Text style={s.habitName}>
+                    الحساب والخصوصية وحذف البيانات
+                  </Text>
                   <SirajIcon name="arrow" color={palette.accent} />
                 </Pressable>
                 <Pressable

@@ -1,7 +1,7 @@
 {
   "name": "sirag-living-desert",
   "displayName": "سراج",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
@@ -11,7 +11,9 @@
     "web": "npx expo start --web",
     "test": "tsx --test test/*.test.ts",
     "build:oasis": "python3 scripts/build-oasis-html.py prototype/sirag-oasis.html src/oasis/oasisHtml.ts",
-    "web:preview": "npx expo export -p web --output-dir dist-web && npx serve dist-web"
+    "web:preview": "npx expo export -p web --output-dir dist-web && npx serve dist-web",
+    "play:check": "node scripts/check-play-release.cjs",
+    "play:public-check": "node scripts/check-play-release.cjs --public"
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",

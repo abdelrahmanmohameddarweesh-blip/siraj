@@ -115,3 +115,7 @@ The homepage now includes **صحبة**: no-email create/join, 2–30 members, 1�
 ## Optional oasis rewarded ads
 
 Optional seed, water and daily-gift offers are implemented in the oasis. [AdMob setup, placements and testing](docs/REWARDED-ADS.md). Expo Go/web can preview offers but cannot show real rewarded ads; a native build is needed. Development uses Google test ads, release defaults off, and Firebase Spark is unchanged.
+
+## Google Play release preparation
+
+[Android build, store assets, privacy/deletion and release blockers](docs/PLAY-RELEASE.md). The owner selected an audience including under-13s; public release is pending a child-appropriate feature/consent scope. No signed AAB or store submission has been produced here. Existing Play account confirmed; no new registration or paid build was started.

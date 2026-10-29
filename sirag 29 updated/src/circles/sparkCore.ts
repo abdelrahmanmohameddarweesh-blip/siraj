@@ -300,6 +300,13 @@ export function sparkCore(store: Store) {
       });
       return { code };
     },
+    async redactRemoval(uid: string, id: string) {
+      await store.transaction(async (tx) => {
+        const c = await tx.get(root(id));
+        if (c && c.lastRemovedUid === uid)
+          tx.set(root(id), { ...c, lastRemovedUid: "" });
+      });
+    },
     async leave(uid: string, id: string, target = uid) {
       await store.transaction(async (tx) => {
         const c = await tx.get(root(id));

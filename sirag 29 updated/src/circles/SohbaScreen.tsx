@@ -1274,6 +1274,11 @@ export default function SohbaScreen({
                   )}
               </>
             )}
+            {button(
+              "الحساب والخصوصية وحذف البيانات",
+              () => navigation.navigate("Account"),
+              true,
+            )}
             {button("لاحقًا، تابع دون بريد", back, true)}
           </View>
         )}

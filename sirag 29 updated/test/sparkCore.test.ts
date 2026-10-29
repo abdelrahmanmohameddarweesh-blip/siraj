@@ -221,3 +221,16 @@ test("Spark custom and tracked habits retain their distinct units with bounded v
   assert.equal(recordFor("custom", 3, { day: "x", value: 3 }).done, true);
   assert.throws(() => recordFor("prayers", 5, { day: "x", value: 6 }));
 });
+
+test("a departed member can redact only their own removal marker without changing other circle data", async () => {
+  const h = harness(),
+    { circleId, code } = await h.core.create("owner", "أحمد", h.draft, "UTC");
+  await h.core.join("friend", "مريم", code);
+  await h.core.leave("owner", circleId);
+  assert.equal(h.rows.get(root(circleId))!.lastRemovedUid, "owner");
+  await h.core.redactRemoval("stranger", circleId);
+  assert.equal(h.rows.get(root(circleId))!.lastRemovedUid, "owner");
+  await h.core.redactRemoval("owner", circleId);
+  assert.equal(h.rows.get(root(circleId))!.lastRemovedUid, "");
+  assert.equal(h.rows.get(root(circleId))!.ownerUid, "friend");
+});

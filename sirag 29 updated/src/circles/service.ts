@@ -262,6 +262,7 @@ export async function rotateInvite(id: string) {
 export async function leaveCircle(id: string, target?: string) {
   const u = await ensureCircleUser();
   await core.leave(u.uid, id, target);
+  if (!target || target === u.uid) await core.redactRemoval(u.uid, id);
   invalidate(id);
   if (!target || target === u.uid) await removeCircleReminder(u.uid, id);
 }

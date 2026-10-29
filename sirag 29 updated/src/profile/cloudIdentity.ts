@@ -1,8 +1,9 @@
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth";
 import { profileAuth } from "./cloudAuth";
 import { identitySession } from "./identitySession";
+import { accountSyncBlocked } from "../account/maintenance";
 let ready: Promise<void> | null = null;
-function waitForAuth() {
+export function waitForAuth() {
   if (!ready)
     ready = new Promise<void>((resolve, reject) => {
       const unsubscribe = onAuthStateChanged(
@@ -19,8 +20,14 @@ function waitForAuth() {
     });
   return ready;
 }
-export const ensureAuthenticatedUser = identitySession(
+const resolveIdentity = identitySession(
   waitForAuth,
   () => profileAuth.currentUser,
   async () => (await signInAnonymously(profileAuth)).user,
 );
+
+export async function ensureAuthenticatedUser() {
+  if (await accountSyncBlocked())
+    throw new Error("حذف الحساب قيد الإكمال. افتح إعدادات الحساب لإكماله.");
+  return resolveIdentity();
+}
