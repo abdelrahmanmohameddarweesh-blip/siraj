@@ -63,6 +63,27 @@ rep("$('menuBtn').onclick = menuSheet;", "$('menuBtn').onclick = menuSheet;\nif(
 rep("  $('habitRing').innerHTML = ringSVG(dc, HABITS.length);",
     "  if(BRIDGE) $('habitChips').innerHTML += '<button class=\"chip-h\" id=\"addHabitChip\" aria-label=\"إضافة عادة\"><span class=\"cc\" style=\"border-style:dashed\"><span class=\"gi\" style=\"font-size:22px;line-height:22px;text-align:center\" aria-hidden=\"true\">＋</span></span><small>إضافة</small></button>';\n  const ahc = $('addHabitChip'); if(ahc) ahc.onclick = e=>{ e.stopPropagation(); toRN({type:'navigate', to:'HabitSetup'}); };\n  $('habitRing').innerHTML = ringSVG(dc, Math.max(1,HABITS.length));")
 
+# Optional rewarded garden bonuses. No advertising in habit completion screens.
+rep('<button class="round glass" id="soundBtn"></button>', '<button class="round glass bridge-only" id="gardenGiftBtn" aria-label="هدية الواحة بإعلان اختياري"><span aria-hidden="true" style="font-size:22px">🎁</span></button><button class="round glass" id="soundBtn"></button>')
+rep("function pickerSheet(i, from){", """function gardenAdAvailable(){ return BRIDGE && MODE==='game' && !!INIT.adsOffers; }
+function offerGardenAd(placement){ if(!gardenAdAvailable()) return false; closeSheet(); toRN({type:'rewardedAdRequest',placement}); return true; }
+function gardenResourceSheet(kind){
+  if(!gardenAdAvailable()) return false;
+  const seed=kind==='seed';
+  openSheet('<h2>'+(seed?'بذرة جديدة لواحتك':'ماء إضافي لنبتتك')+'</h2><p>'+(seed?'أكمل عاداتك لتحصل على البذور مجانًا، أو اختر إعلانًا بمكافأة لبذرة إضافية.':'يمكنك كسب الماء من عاداتك، أو مشاهدة إعلان اختياري لقطرتي ماء.')+'</p><button class="primary" id="gardenAdWatch">مشاهدة إعلان بمكافأة · '+(seed?'بذرة واحدة':'قطرتا ماء')+'</button><button class="secondary" id="gardenAdSkip">المتابعة دون إعلان</button>');
+  $('gardenAdWatch').onclick=()=>offerGardenAd(kind);
+  $('gardenAdSkip').onclick=closeSheet;
+  return true;
+}
+function pickerSheet(i, from){""")
+rep("  html += '<button class=\"secondary\" id=\"pkCancel\">لاحقًا</button>';", "  if(gardenAdAvailable()) html += '<button class=\"secondary\" id=\"pickerAdSeed\">بذرة إضافية بإعلان اختياري</button>';\n  html += '<button class=\"secondary\" id=\"pkCancel\">لاحقًا</button>';")
+rep("  $('pkCancel').onclick = closeSheet;", "  $('pkCancel').onclick = closeSheet; const extra=$('pickerAdSeed'); if(extra) extra.onclick=()=>offerGardenAd('seed');")
+rep("    else toast(doneCount()===0 ? 'أكمل أول عادة اليوم لتحصل على بذرة.' : 'بذرة الغد تأتي مع أول عادة غدًا.');", "    else if(!gardenResourceSheet('seed')) toast(doneCount()===0 ? 'أكمل أول عادة اليوم لتحصل على بذرة.' : 'بذرة الغد تأتي مع أول عادة غدًا.');")
+rep("  if(S.drops<=0){ toast('أكمل عادة أخرى لتحصل على قطرة ماء.'); return; }", "  if(S.drops<=0){ if(!gardenResourceSheet('water')) toast('أكمل عادة أخرى لتحصل على قطرة ماء.'); return; }")
+rep("if(kind==='seed' && S.seeds<=0){ toast(", "if(kind==='seed' && S.seeds<=0){ if(gardenResourceSheet('seed')) return; toast(")
+rep("if(kind==='water' && S.drops<=0){ toast(", "if(kind==='water' && S.drops<=0){ if(gardenResourceSheet('water')) return; toast(")
+rep("$('soundBtn').onclick =", "$('gardenGiftBtn').onclick=()=>offerGardenAd('gift'); if(!gardenAdAvailable()) $('gardenGiftBtn').style.display='none';\n$('soundBtn').onclick =")
+
 # public API for the app
 rep("DB.open().then(()=>DB.all())", '''function applyGrants(grants, fromOpen){
   if(!Array.isArray(grants) || !grants.length) return false;
@@ -86,7 +107,7 @@ rep("DB.open().then(()=>DB.all())", '''function applyGrants(grants, fromOpen){
   return true;
 }
 window.SiragOasis = {
-  update(d){ if(d && Array.isArray(d.habits)) HABITS = d.habits; applyGrants(d && d.grants, false); renderAll(); },
+  update(d){ if(d && Array.isArray(d.habits)) HABITS = d.habits; applyGrants(d && d.grants, false); if(d && d.forceSave) save(); renderAll(); },
   setInsets(i){ document.documentElement.style.setProperty('--sat', i.top+'px'); document.documentElement.style.setProperty('--sab', i.bottom+'px'); syncDrawerH(); }
 };
 if(BRIDGE){ applyGrants(INIT.grants, true); toRN({type:'ready'}); }
