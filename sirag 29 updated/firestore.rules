@@ -27,39 +27,194 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Sohba writes go through authenticated callable functions, never clients.
-    function circleMember(circleId) {
-      return request.auth != null && exists(/databases/$(database)/documents/sohbaCircles/$(circleId)/members/$(request.auth.uid));
+    // Spark-only circles. Client transactions + rules replace paid Functions.
+    function signed() { return request.auth != null; }
+    function sc(cid) { return get(/databases/$(database)/documents/sparkCircles/$(cid)).data; }
+    function afterCircle(cid) { return getAfter(/databases/$(database)/documents/sparkCircles/$(cid)).data; }
+    function memberOf(cid) { return signed() && request.auth.uid in sc(cid).members; }
+    function owns(cid) { return memberOf(cid) && sc(cid).ownerUid == request.auth.uid; }
+    function selfMember(cid, uid) { return getAfter(/databases/$(database)/documents/sparkCircles/$(cid)/members/$(uid)).data; }
+    function dayNumber(day) { return timestamp.date(int(day.split('-')[0]), int(day.split('-')[1]), int(day.split('-')[2])).toMillis() / 86400000; }
+    function validText(value, maximum) { return value is string && value.size() >= 2 && value.size() <= maximum; }
+    function validGoal(activity, goal) {
+      return goal is int && goal >= 1 && (
+        (activity == 'reading' && goal <= 604) || (activity == 'listening' && goal <= 180) ||
+        (activity == 'prayers' && goal <= 5) || (activity in ['adhkar_morning', 'adhkar_evening'] && goal == 1) ||
+        (activity in ['hifz', 'hifz_review'] && goal <= 1000) || (activity == 'custom' && goal <= 10000));
     }
-    match /sohbaAccounts/{uid}/circles/{circleId} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow write: if false;
+    function optionsValid(d) {
+      return d.maxMembers is int && d.maxMembers >= 2 && d.maxMembers <= 30 && d.maxMembers >= d.members.size()
+        && d.showNames is bool && d.showGroupProgress is bool && d.showMemberProgress is bool
+        && d.showCompletedMembers is bool && d.showPendingMembers is bool && validText(d.name, 50);
     }
-    match /sohbaCircles/{circleId} {
-      allow read: if circleMember(circleId);
-      allow write: if false;
+    function validInvitation(cid,code,version) {
+      let invitation = get(/databases/$(database)/documents/sparkInvites/$(code)).data;
+      return invitation.circleId == cid && invitation.version == version;
+    }
+    function joinValid(cid, old, next) {
+      let uid = request.auth.uid;
+      let added = next.members.diff(old.members);
+
+      return !(uid in old.members) && added.addedKeys().hasOnly([uid]) && added.addedKeys().size() == 1
+        && added.affectedKeys().hasOnly([uid]) && next.members[uid] == old.nextMemberNumber
+        && next.memberCount == old.memberCount + 1 && next.memberCount <= old.maxMembers
+        && next.nextMemberNumber == old.nextMemberNumber + 1
+        && next.diff(old).affectedKeys().hasOnly(['members', 'memberCount', 'nextMemberNumber'])
+        && validInvitation(cid,selfMember(cid,uid).joinCode,old.inviteVersion)
+        && request.time.toMillis() / 86400000 <= old.endEpoch + 2;
+    }
+    function removalValid(cid, old, next) {
+      let removed = next.members.diff(old.members).removedKeys();
+      let target = next.lastRemovedUid;
+      return removed.size() == 1 && next.members.diff(old.members).affectedKeys().hasOnly([target])
+        && (target == request.auth.uid || old.ownerUid == request.auth.uid)
+        && next.members.size() > 0 && next.memberCount == old.memberCount - 1
+        && next.ownerUid in next.members && (old.ownerUid == target || next.ownerUid == old.ownerUid)
+        && next.inviteVersion == old.inviteVersion + 1
+        && next.diff(old).affectedKeys().hasOnly(['members', 'memberCount', 'ownerUid', 'inviteVersion','lastRemovedUid'])
+        && !existsAfter(/databases/$(database)/documents/sparkCircles/$(cid)/members/$(target));
+    }
+    match /sparkCircles/{cid} {
+      // Random document IDs provide unlisted metadata previews; browsing is denied.
+      // Names, records and progress remain in membership-protected subcollections.
+      allow get: if signed();
+      allow list: if false;
+      allow create: if signed() && request.resource.data.keys().hasOnly(['id','name','activity','sharedGoal','habitName','startDay','endDay','startEpoch','endEpoch','timeZone','ownerUid','memberCount','members','nextMemberNumber','inviteVersion','lastRemovedUid','createdAt','maxMembers','showNames','showGroupProgress','showMemberProgress','showCompletedMembers','showPendingMembers'])
+        && request.resource.data.id == cid && optionsValid(request.resource.data)
+        && request.resource.data.ownerUid == request.auth.uid && request.resource.data.memberCount == 1
+        && request.resource.data.members.keys().hasOnly([request.auth.uid]) && request.resource.data.members.size() == 1
+        && request.resource.data.members[request.auth.uid] == 1 && request.resource.data.nextMemberNumber == 2 && request.resource.data.inviteVersion == 1 && request.resource.data.lastRemovedUid == ''
+        && validGoal(request.resource.data.activity, request.resource.data.sharedGoal)
+        && request.resource.data.startEpoch == dayNumber(request.resource.data.startDay)
+        && request.resource.data.endEpoch == dayNumber(request.resource.data.endDay)
+        && request.resource.data.endEpoch >= request.resource.data.startEpoch && request.resource.data.endEpoch - request.resource.data.startEpoch < 90
+        && request.resource.data.startEpoch >= request.time.toMillis() / 86400000 - 2
+        && request.resource.data.startEpoch <= request.time.toMillis() / 86400000 + 7
+        && request.resource.data.timeZone is string && request.resource.data.timeZone.size() <= 64
+        && (request.resource.data.habitName == null || validText(request.resource.data.habitName,50))
+        && selfMember(cid, request.auth.uid).uid == request.auth.uid;
+      allow update: if signed() && optionsValid(request.resource.data) && request.resource.data.memberCount == request.resource.data.members.size() && (
+        joinValid(cid, resource.data, request.resource.data) || removalValid(cid, resource.data, request.resource.data) ||
+        (owns(cid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name','maxMembers','showNames','showGroupProgress','showMemberProgress','showCompletedMembers','showPendingMembers'])) ||
+        (owns(cid) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['inviteVersion']) && request.resource.data.inviteVersion == resource.data.inviteVersion + 1));
+      allow delete: if signed() && resource.data.members.keys().hasOnly([request.auth.uid]) && resource.data.members.size() == 1 && !existsAfter(/databases/$(database)/documents/sparkCircles/$(cid)/members/$(request.auth.uid));
       match /members/{uid} {
-        // Even the creator cannot read someone else's goals, tokens or amounts.
-        allow read: if circleMember(circleId) && request.auth.uid == uid;
-        allow write: if false;
-        match /days/{day} {
-          allow read: if circleMember(circleId) && request.auth.uid == uid;
-          allow write: if false;
-        }
+        allow get: if signed() && request.auth.uid == uid;
+        allow list: if false;
+        allow create: if signed() && uid == request.auth.uid && uid in afterCircle(cid).members
+          && request.resource.data.keys().hasOnly(['uid','name','activity','goal','visible','nameVisible','joinedAt','updatedAt','days','doneMap','percentMap','lastDay','joinCode'])
+          && request.resource.data.uid == uid && validText(request.resource.data.name,50)
+          && request.resource.data.activity == afterCircle(cid).activity && request.resource.data.goal == afterCircle(cid).sharedGoal
+          && request.resource.data.visible == true && request.resource.data.nameVisible == true
+          && request.resource.data.days is map && request.resource.data.days.size() == 0 && request.resource.data.doneMap is map && request.resource.data.doneMap.size() == 0 && request.resource.data.percentMap is map && request.resource.data.percentMap.size() == 0 && request.resource.data.lastDay == '';
+        allow update: if signed() && uid == request.auth.uid && memberOf(cid) && (
+          (request.resource.data.diff(resource.data).affectedKeys().hasAny(['days','doneMap','percentMap','lastDay']) && progressWrite(cid, resource.data, request.resource.data)) ||
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['visible','nameVisible','updatedAt'])
+            && request.resource.data.visible is bool && request.resource.data.nameVisible is bool
+            && (request.resource.data.nameVisible || !existsAfter(/databases/$(database)/documents/sparkCircles/$(cid)/names/$(uid)))
+            && (request.resource.data.visible || (
+              !existsAfter(/databases/$(database)/documents/sparkCircles/$(cid)/completed/$(uid)) && !existsAfter(/databases/$(database)/documents/sparkCircles/$(cid)/pending/$(uid)) &&
+              !existsAfter(/databases/$(database)/documents/sparkCircles/$(cid)/completedProgress/$(uid)) && !existsAfter(/databases/$(database)/documents/sparkCircles/$(cid)/pendingProgress/$(uid))))));
+        allow delete: if signed() && (uid == request.auth.uid || owns(cid)) && (!existsAfter(/databases/$(database)/documents/sparkCircles/$(cid)) || !(uid in afterCircle(cid).members));
       }
-      match /companions/{uid} {
-        allow read: if circleMember(circleId);
-        allow write: if false;
+      match /secrets/invite {
+        allow get: if owns(cid);
+        allow list: if false;
+        allow create, update: if signed() && afterCircle(cid).ownerUid == request.auth.uid && request.auth.uid in afterCircle(cid).members
+          && request.resource.data.keys().hasOnly(['code','version']) && request.resource.data.code is string && request.resource.data.code.matches('[A-F0-9]{12}')
+          && request.resource.data.version == afterCircle(cid).inviteVersion;
+        allow delete: if owns(cid);
       }
-      match /days/{day} {
-        allow read: if circleMember(circleId) && (!('showGroupProgress' in get(/databases/$(database)/documents/sohbaCircles/$(circleId)).data) || get(/databases/$(database)/documents/sohbaCircles/$(circleId)).data.showGroupProgress != false);
-        allow write: if false;
+      match /names/{uid} {
+        allow read: if publicRead(cid,uid) && sc(cid).showNames;
+        allow create, update: if publicWrite(cid,uid) && request.resource.data.keys().hasOnly(['uid','name'])
+          && selfMember(cid,uid).nameVisible && request.resource.data.name == selfMember(cid,uid).name;
+        allow delete: if deletePublic(cid,uid);
       }
-      match /encouragement/{id} {
-        // Served by sohbaFeed with current aliases, including legacy records.
-        allow read: if false;
-        allow write: if false;
+      match /contributions/{uid} {
+        allow read: if publicRead(cid,uid) && sc(cid).showGroupProgress;
+        allow create, update: if publicWrite(cid,uid) && request.resource.data.keys().hasOnly(['uid','days']) && request.resource.data.days == selfMember(cid,uid).doneMap;
+        allow delete: if deletePublic(cid,uid);
       }
+      match /completed/{uid} {
+        allow read: if publicRead(cid,uid) && sc(cid).showCompletedMembers;
+        allow create, update: if statusWrite(cid,uid) && matchingMap(cid,uid,'doneMap') && request.resource.data.days.values().toSet().hasOnly([true]);
+        allow delete: if deletePublic(cid,uid);
+      }
+      match /pending/{uid} {
+        allow read: if publicRead(cid,uid) && sc(cid).showPendingMembers;
+        allow create, update: if statusWrite(cid,uid) && matchingMap(cid,uid,'doneMap') && request.resource.data.days.values().toSet().hasOnly([false]);
+        allow delete: if deletePublic(cid,uid);
+      }
+      match /completedProgress/{uid} {
+        allow read: if publicRead(cid,uid) && sc(cid).showMemberProgress && sc(cid).showCompletedMembers;
+        allow create, update: if statusWrite(cid,uid) && matchingMap(cid,uid,'percentMap') && request.resource.data.days.values().toSet().hasOnly([100]);
+        allow delete: if deletePublic(cid,uid);
+      }
+      match /pendingProgress/{uid} {
+        allow read: if publicRead(cid,uid) && sc(cid).showMemberProgress && sc(cid).showPendingMembers;
+        allow create, update: if statusWrite(cid,uid) && matchingMap(cid,uid,'percentMap') && request.resource.data.days.values().toSet().hasOnly([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99]);
+        allow delete: if deletePublic(cid,uid);
+      }
+      match /encouragement/{uid} {
+        allow read: if publicRead(cid,uid);
+        allow create, update: if signed() && uid == request.auth.uid && memberOf(cid)
+          && request.resource.data.keys().hasOnly(['uid','message','day','createdAt']) && request.resource.data.uid == uid
+          && request.resource.data.message in ['بارك الله فيكم','معًا نستمر','تقبّل الله']
+          && request.resource.data.createdAt is int && request.resource.data.createdAt <= request.time.toMillis() + 60000
+          && request.resource.data.createdAt >= request.time.toMillis() - 60000
+          && (!exists(/databases/$(database)/documents/sparkCircles/$(cid)/encouragement/$(uid)) || request.resource.data.createdAt - resource.data.createdAt >= 60000);
+        allow delete: if deletePublic(cid,uid);
+      }
+    }
+    function publicRead(cid,uid) { return memberOf(cid) && resource.data.uid in sc(cid).members; }
+    function publicWrite(cid,uid) { return signed() && uid == request.auth.uid && uid in afterCircle(cid).members && request.resource.data.uid == uid; }
+    function deletePublic(cid,uid) { return signed() && (uid == request.auth.uid || (owns(cid) && !(uid in afterCircle(cid).members))); }
+    function matchingMap(cid,uid,key) {
+      return request.resource.data.days.diff(selfMember(cid,uid)[key]).unchangedKeys().hasAll(request.resource.data.days.keys());
+    }
+    function statusWrite(cid,uid) {
+      return publicWrite(cid,uid) && selfMember(cid,uid).visible && request.resource.data.keys().hasOnly(['uid','days']) && request.resource.data.days is map
+        && request.resource.data.days.keys().hasOnly(selfMember(cid,uid).days.keys());
+    }
+    function progressWrite(cid,old,next) {
+      let day = next.lastDay;
+      let r = next.days[day];
+      let target = old.goal * (old.activity == 'listening' ? 60 : 1);
+      return next.diff(old).affectedKeys().hasOnly(['days','doneMap','percentMap','lastDay','updatedAt'])
+        && day is string && day.matches('[0-9]{4}-[0-9]{2}-[0-9]{2}')
+        && dayNumber(day) >= sc(cid).startEpoch && dayNumber(day) <= sc(cid).endEpoch
+        && dayNumber(day) >= request.time.toMillis() / 86400000 - 2 && dayNumber(day) <= request.time.toMillis() / 86400000 + 1
+        && next.days is map && next.days.size() <= 90 && next.days.diff(old.days).affectedKeys().hasOnly([day])
+        && next.doneMap is map && next.doneMap.size() <= 90 && next.doneMap.diff(old.doneMap).affectedKeys().hasOnly([day])
+        && next.percentMap is map && next.percentMap.size() <= 90 && next.percentMap.diff(old.percentMap).affectedKeys().hasOnly([day]) && next.percentMap[day] == r.percent
+        && r.keys().hasOnly(['day','value','pages','seconds','done','percent']) && r.day == day
+        && r.value is int && r.value >= 0 && r.value <= (old.activity == 'listening' ? 86400 : (old.activity == 'reading' ? 604 : (old.activity == 'prayers' ? 5 : (old.activity in ['adhkar_morning','adhkar_evening'] ? 1 : (old.activity == 'custom' ? 10000 : 1000)))))
+        && r.done == (r.value >= target) && next.doneMap[day] == r.done
+        && r.percent is int && r.percent >= 0 && r.percent <= 100 && r.percent == (r.done ? 100 : int(r.value * 100 / target))
+        && r.pages == (old.activity == 'reading' ? r.value : 0) && r.seconds == (old.activity == 'listening' ? r.value : 0);
+    }
+    match /sparkInvites/{code} {
+      allow get: if signed();
+      allow list: if false;
+      allow create: if signed() && code.matches('[A-F0-9]{12}') && request.resource.data.keys().hasOnly(['circleId','version'])
+        && afterCircle(request.resource.data.circleId).ownerUid == request.auth.uid
+        && request.auth.uid in afterCircle(request.resource.data.circleId).members
+        && request.resource.data.version == afterCircle(request.resource.data.circleId).inviteVersion;
+      allow update: if false;
+      allow delete: if owns(resource.data.circleId);
+    }
+    match /sparkAccounts/{uid}/circles/{cid} {
+      allow read: if signed() && request.auth.uid == uid;
+      allow create, update: if signed() && request.auth.uid == uid && uid in afterCircle(cid).members
+        && request.resource.data.keys().hasOnly(['circleId']) && request.resource.data.circleId == cid;
+      allow delete: if signed() && (request.auth.uid == uid || owns(cid));
+    }
+    match /sparkReports/{reportId} {
+      allow create: if signed() && memberOf(request.resource.data.circleId)
+        && request.resource.data.keys().hasOnly(['circleId','uid','reason','createdAt']) && request.resource.data.uid == request.auth.uid
+        && validText(request.resource.data.reason,500);
+      allow read, update, delete: if false;
     }
 
     // Public / Global Leaderboards

@@ -6,11 +6,6 @@ import {
   sendEmailVerification,
 } from "firebase/auth";
 import {
-  getFunctions,
-  httpsCallable,
-  connectFunctionsEmulator,
-} from "firebase/functions";
-import {
   collection,
   doc,
   getDoc,
@@ -18,10 +13,8 @@ import {
   getFirestore,
   onSnapshot,
   query,
-  orderBy,
-  limit,
 } from "firebase/firestore";
-import app, { emulatorHost } from "../firebase/init";
+import app from "../firebase/init";
 import { profileAuth } from "../profile/cloudAuth";
 import { ensureAuthenticatedUser } from "../profile/cloudIdentity";
 import { loadProfile, PROFILE_KEY } from "../profile/profileStore";
@@ -44,9 +37,21 @@ import {
   circleDay,
   inviteCode,
 } from "./model";
-const db = getFirestore(app),
-  functions = getFunctions(app, "europe-west1");
-if (emulatorHost) connectFunctionsEmulator(functions, emulatorHost, 5001);
+import { sparkCore, root, own, SparkCircle } from "./sparkCore";
+import {
+  sparkDB as db,
+  store,
+  cached,
+  fetchDetail,
+  watchDetail,
+  invalidate,
+} from "./sparkFirestore";
+import {
+  configureCircleReminder,
+  loadCircleReminder,
+  removeCircleReminder,
+} from "./notifications";
+const core = sparkCore(store);
 export const ensureCircleUser = ensureAuthenticatedUser;
 export async function accountStatus() {
   const u = await ensureCircleUser();
@@ -120,135 +125,182 @@ export async function verifyEmail() {
   const u = await ensureCircleUser();
   await sendEmailVerification(u);
 }
-async function call<T>(name: string, data: object): Promise<T> {
-  await ensureCircleUser();
-  const result = await httpsCallable<object, T>(functions, name)(data);
-  return result.data;
-}
+
 export async function listCircles(): Promise<Circle[]> {
   const u = await ensureCircleUser();
-  const list = await getDocs(collection(db, "sohbaAccounts", u.uid, "circles"));
-  const rows = await Promise.all(
-    list.docs.map(async (s) => {
-      const c = await getDoc(doc(db, "sohbaCircles", s.id));
-      return c.exists() ? ({ ...c.data(), id: c.id } as Circle) : null;
+  const index = await getDocs(
+    collection(db, "sparkAccounts", u.uid, "circles"),
+  );
+  const circles = await Promise.all(
+    index.docs.map(async (row) => {
+      const c = await store.get(root(row.id));
+      return c && Object.prototype.hasOwnProperty.call(c.members, u.uid)
+        ? (c as Circle)
+        : null;
     }),
   );
-  return rows
+  return circles
     .filter((c): c is Circle => !!c)
     .sort((a, b) => b.createdAt - a.createdAt);
 }
-export const previewCircle = (code: string) =>
-  call<Omit<Circle, "id" | "ownerUid" | "createdAt"> & { circleId: string }>(
-    "sohbaPreview",
-    { code: inviteCode(code) },
-  );
 export async function createCircle(data: CircleDraft) {
-  const p = await loadProfile();
-
-  return call<{ circleId: string; code: string }>("sohbaCreate", {
-    ...data,
-    displayName: p?.name || "رفيق",
-    timeZone:
-      Intl.DateTimeFormat().resolvedOptions().timeZone || "Africa/Cairo",
-  });
+  const u = await ensureCircleUser(),
+    p = await loadProfile();
+  const result = await core.create(
+    u.uid,
+    p?.name || "رفيق",
+    data,
+    Intl.DateTimeFormat().resolvedOptions().timeZone || "Africa/Cairo",
+  );
+  invalidate(result.circleId);
+  return result;
 }
-export async function joinCircle(
-  code: string,
-  goal?: number,
-  visible = true,
-  activity?: Activity,
-) {
-  const p = await loadProfile();
-
-  return call<{ circleId: string }>("sohbaJoin", {
-    code: inviteCode(code),
-    ...(goal !== undefined ? { goal } : {}),
-    visible,
-    ...(activity ? { activity } : {}),
-    displayName: p?.name || "رفيق",
-  });
+export async function joinCircle(raw: string) {
+  const code = inviteCode(raw);
+  if (!/^[A-F0-9]{12}$/.test(code)) throw new Error("رمز دعوة غير صالح");
+  const u = await ensureCircleUser(),
+    p = await loadProfile();
+  const result = await core.join(u.uid, p?.name || "رفيق", code);
+  invalidate(result.circleId);
+  return result;
 }
 export async function loadCircle(id: string): Promise<CircleDetail> {
   const u = await ensureCircleUser(),
-    base = doc(db, "sohbaCircles", id);
-  const c = await getDoc(base);
-  if (!c.exists()) throw new Error("الصحبة غير موجودة");
-  const [m, companions, days, mine, enc] = await Promise.all([
-    getDoc(doc(base, "members", u.uid)),
-    getDocs(collection(base, "companions")),
-    c.data().showGroupProgress === false
-      ? Promise.resolve(null)
-      : getDocs(collection(base, "days")),
-    getDocs(collection(base, "members", u.uid, "days")),
-    call<CircleDetail["encouragement"]>("sohbaFeed", { circleId: id }),
-  ]);
-  if (!c.exists() || !m.exists()) throw new Error("لم تعد عضوًا في هذه الصحبة");
-  return {
-    circle: { ...c.data(), id: c.id } as Circle,
-    member: m.data() as Membership,
-    companions: companions.docs.map((s) => s.data() as Companion),
-    days: Object.fromEntries(
-      (days?.docs || []).map((s) => [s.id, s.data().completed]),
-    ),
-    mine: Object.fromEntries(
-      mine.docs.map((s) => [s.id, s.data() as PrivateDay]),
-    ),
-    encouragement: enc,
-  };
+    d = await fetchDetail(id, u.uid);
+  let reminder = await loadCircleReminder(u.uid, id);
+  if (reminder.reminders && reminder.refreshedDay !== localDay()) {
+    try {
+      await configureCircleReminder(
+        u.uid,
+        id,
+        d.circle.name,
+        reminder,
+        (d.circle as SparkCircle).endEpoch,
+        (d.circle as SparkCircle).startEpoch,
+      );
+      reminder = await loadCircleReminder(u.uid, id);
+    } catch {
+      /* Retry when opening tomorrow or changing reminder settings. */
+    }
+  }
+  return { ...d, member: { ...d.member, ...reminder, summary: false } };
 }
-export async function syncCircle(
-  circle: Circle,
-  memberActivity: Activity = circle.activity,
-) {
-  if (!canSync(circle) || memberActivity === "custom") return false;
-  const day = circleDay(circle.timeZone),
-    source = await loadReportSources([localDay()]);
-  await call("sohbaCheckin", {
-    circleId: circle.id,
-    day,
-    ...progressForHabit(memberActivity, source, day),
-  });
+export async function syncCircle(c: Circle, activity: Activity = c.activity) {
+  if (!canSync(c) || activity === "custom") return false;
+  const u = await ensureCircleUser(),
+    day = circleDay(c.timeZone),
+    source = await loadReportSources([localDay()]),
+    data = { day, ...progressForHabit(activity, source, day) };
+  const value =
+    activity === "reading"
+      ? data.pages
+      : activity === "listening"
+        ? data.seconds
+        : data.value;
+  if (cached(c.id, u.uid)?.mine[day]?.value === value) return true;
+  const changed = await core.checkin(u.uid, c.id, data);
+  if (changed) invalidate(c.id);
   return true;
 }
 export function watchCircle(
   id: string,
   refresh: () => void,
-  onError: (e: Error) => void,
-  showGroupProgress = true,
+  error: (e: Error) => void,
+  _showGroupProgress = true,
 ) {
-  const base = doc(db, "sohbaCircles", id);
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const changed = () => {
-    if (timer) clearTimeout(timer);
-    timer = setTimeout(refresh, 120);
-  };
-  const subscriptions = [
-    onSnapshot(base, changed, onError),
-    ...["companions", ...(showGroupProgress ? ["days"] : [])].map((name) =>
-      onSnapshot(collection(base, name), changed, onError),
-    ),
-  ];
+  let stop: (() => void) | undefined,
+    alive = true;
+  void ensureCircleUser()
+    .then((u) => {
+      if (alive) stop = watchDetail(id, u.uid, refresh, error);
+    })
+    .catch(error);
   return () => {
-    if (timer) clearTimeout(timer);
-    subscriptions.forEach((unsub) => unsub());
+    alive = false;
+    stop?.();
   };
 }
-export const encourage = (circleId: string, message: string) =>
-  call("sohbaEncourage", { circleId, message });
-export const preferences = (circleId: string, data: Partial<Membership>) =>
-  call("sohbaPreferences", { circleId, ...data });
-export const rotateInvite = (circleId: string) =>
-  call<{ code: string }>("sohbaRotateInvite", { circleId });
-export const leaveCircle = (circleId: string, memberUid?: string) =>
-  call("sohbaLeave", { circleId, ...(memberUid ? { memberUid } : {}) });
-export const reportCircle = (circleId: string, reason: string) =>
-  call("sohbaReport", { circleId, reason });
+export async function preferences(id: string, data: Partial<Membership>) {
+  const u = await ensureCircleUser();
+  await core.preferences(u.uid, id, !!data.visible, data.nameVisible !== false);
+  invalidate(id);
+  const c = await store.get(root(id));
+  if (!c) throw new Error("الصحبة غير موجودة");
+  try {
+    await configureCircleReminder(
+      u.uid,
+      id,
+      c.name,
+      {
+        reminders: !!data.reminders,
+        reminderHour: data.reminderHour ?? 20,
+        reminderMinute: data.reminderMinute ?? 0,
+      },
+      c.endEpoch,
+      c.startEpoch,
+    );
+  } catch (e) {
+    throw new Error(
+      "تم حفظ الخصوصية، لكن تعذّر ضبط تذكير الهاتف: " + (e as Error).message,
+    );
+  }
+}
+export async function updateCircle(
+  id: string,
+  data: CircleOptions & { name: string },
+) {
+  const u = await ensureCircleUser();
+  await core.update(u.uid, id, data);
+  invalidate(id);
+}
+export async function rotateInvite(id: string) {
+  const u = await ensureCircleUser();
+  const result = await core.rotate(u.uid, id);
+  invalidate(id);
+  return result;
+}
+export async function leaveCircle(id: string, target?: string) {
+  const u = await ensureCircleUser();
+  await core.leave(u.uid, id, target);
+  invalidate(id);
+  if (!target || target === u.uid) await removeCircleReminder(u.uid, id);
+}
+export async function manualCheckin(id: string, day: string, value: number) {
+  const u = await ensureCircleUser();
+  await core.checkin(u.uid, id, { day, value });
+  invalidate(id);
+}
+export async function encourage(id: string, message: string) {
+  if (!["بارك الله فيكم", "معًا نستمر", "تقبّل الله"].includes(message))
+    throw new Error("اختر رسالة تشجيع");
+  const u = await ensureCircleUser(),
+    c = await store.get(root(id));
+  if (!c) throw new Error("الصحبة غير موجودة");
+  await store.transaction(async (tx) => {
+    const path = root(id) + "/encouragement/" + u.uid,
+      old = await tx.get(path);
+    if (old && Date.now() - old.createdAt < 60000)
+      throw new Error("انتظر دقيقة قبل التشجيع مجددًا");
+    tx.set(path, {
+      uid: u.uid,
+      message,
+      day: circleDay(c.timeZone),
+      createdAt: Date.now(),
+    });
+  });
+  invalidate(id);
+}
+export async function reportCircle(id: string, reason: string) {
+  if (reason.trim().length < 2 || reason.trim().length > 500)
+    throw new Error("اكتب سبب الإبلاغ من حرفين إلى ٥٠٠ حرف");
+  const u = await ensureCircleUser();
+  await store.transaction(async (tx) => {
+    tx.set("sparkReports/" + store.newId(), {
+      circleId: id,
+      uid: u.uid,
+      reason: reason.trim(),
+      createdAt: Date.now(),
+    });
+  });
+}
 export { friendlyError } from "./errors";
-
-export const updateCircle = (
-  circleId: string,
-  settings: CircleOptions & { name: string },
-) => call("sohbaUpdateCircle", { circleId, ...settings });
-export const manualCheckin = (circleId: string, day: string, value: number) =>
-  call("sohbaCheckin", { circleId, day, value });

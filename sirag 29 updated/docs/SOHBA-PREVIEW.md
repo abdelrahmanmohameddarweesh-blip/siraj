@@ -18,4 +18,6 @@ Browser captures of the implemented React Native screens at a phone viewport. Th
 
 Creators choose 2–30 members, 1–90 days, a habit and target, name visibility, aggregate/individual progress and whether to show completed or pending members. Invitation routes join automatically; code entry needs one button. Email linking is an optional recovery action.
 
-[Firebase activation, native links, privacy and validation](SOHBA.md).
+[Free Spark setup, local reminders, privacy and validation](SOHBA.md).
+
+The current Spark edition uses direct Firestore transactions and local reminders. Cloud group-summary notifications and their switch have been removed; the screenshots illustrate the shared circle screens.

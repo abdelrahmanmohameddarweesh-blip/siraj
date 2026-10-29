@@ -1,0 +1,30 @@
+Siraj — FREE Firebase Spark setup
+
+Keep the Firebase project on Spark. Do not add billing or upgrade to Blaze.
+
+1. Download/extract this version. Use the folder named "sirag 29 updated".
+2. Stop the old Expo server with Control+C.
+3. Open Terminal in the NEW "sirag 29 updated" folder.
+4. Run:
+
+npm ci
+
+5. You already signed in to Firebase. Deploy ONLY the database rules:
+
+npx firebase-tools deploy --project batal-moslem --only firestore:rules
+
+6. After "Deploy complete!", run:
+
+npx expo start --clear
+
+7. Reopen Expo Go and scan the new QR code. Test creating a circle.
+
+The previous functions:sohba deployment command is no longer used.
+Cloud Functions and cloud group-summary notifications have been removed.
+Circle reminders now run locally on the phone.
+
+If any command asks to enable billing, STOP and send its full output. Do not upgrade.
+Spark has free quotas. Service can pause when a quota is reached; this version has
+no payment flow, no automatic billing upgrade, and no deployable Functions target.
+
+See docs/SOHBA.md for behavior, free quotas, privacy, and remaining device/rules tests.

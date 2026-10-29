@@ -1,5 +1,7 @@
 export function friendlyError(error: any) {
   const code = error?.code || "";
+  if (code.includes("resource-exhausted"))
+    return "وصلت الخدمة إلى حد الاستخدام المجاني المؤقت. حاول لاحقًا؛ لن تُفعّل أي ترقية أو رسوم تلقائية.";
   if (
     code.includes("api-key") ||
     /API[_ -]?KEY[_ -]?(NOT[_ -]?VALID|INVALID)|api-key-not-valid/i.test(
@@ -18,7 +20,7 @@ export function friendlyError(error: any) {
     code.includes("not-found") ||
     code.includes("internal")
   )
-    return "تعذّر الاتصال بخدمة الصحبة. تحقق من الإنترنت وتفعيل خدمة صحبة في Firebase.";
+    return "تعذّر الاتصال بخدمة الصحبة. تحقق من الإنترنت ونشر قواعد قاعدة البيانات الخاصة بالصحبة.";
   if (code.includes("permission-denied"))
     return "هذه الصحبة خاصة بأعضائها. تحقق من حسابك وإعدادات Firebase.";
   if (code.includes("operation-not-allowed"))

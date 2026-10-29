@@ -30,7 +30,6 @@ import { homePalettes, HomePalette } from "../design/homeTheme";
 import { localDay } from "../habits/habitData";
 import { addDays } from "../quran/hifz/hifzEngine";
 import { readJSON, updateJSON } from "../storage/jsonStore";
-import { circlePushToken } from "./notifications";
 import {
   Activity,
   Circle,
@@ -102,7 +101,6 @@ export default function SohbaScreen({
     [existing, setExisting] = useState(false),
     [reason, setReason] = useState("");
   const [reminders, setReminders] = useState(false),
-    [summary, setSummary] = useState(false),
     [hour, setHour] = useState("20"),
     [minute, setMinute] = useState("00");
   const scrollRef = useRef<React.ComponentRef<typeof ScrollView>>(null);
@@ -1035,7 +1033,6 @@ export default function SohbaScreen({
                 setVisible(d.member.visible);
                 setNameVisible(d.member.nameVisible !== false);
                 setReminders(d.member.reminders);
-                setSummary(d.member.summary && c.showGroupProgress !== false);
                 setHour(String(d.member.reminderHour));
                 setMinute(String(d.member.reminderMinute).padStart(2, "0"));
                 setPage("preferences");
@@ -1153,8 +1150,7 @@ export default function SohbaScreen({
               التقدم فسيبقيان مخفيين. الإيقاف يخفي حالتك السابقة أيضًا.
             </Text>
             {toggle("تذكير شخصي بالعادة", reminders, setReminders)}
-            {d.circle.showGroupProgress !== false &&
-              toggle("ملخّص يومي للصحبة", summary, setSummary)}
+
             <View style={s.row}>
               {input("الساعة (٠–٢٣)", hour, setHour, {
                 keyboardType: "number-pad",
@@ -1166,8 +1162,9 @@ export default function SohbaScreen({
               })}
             </View>
             <Text style={s.caption}>
-              بتوقيت {d.circle.timeZone}، خلال ربع ساعة بعد الموعد. الإشعارات
-              تحتاج نسخة هاتف مستقلة؛ تجربة بقية الميزات متاحة في Expo Go.
+              تذكير محلي بتوقيت الهاتف، دون خادم أو رسوم. تُجدول ثلاثة تذكيرات
+              قادمة كحد أقصى؛ افتح الصحبة يوميًا لتجديدها. قد يؤخّر الهاتف
+              الإشعار حسب إعداداته.
             </Text>
             {button(
               "احفظ تفضيلاتي",
@@ -1186,17 +1183,12 @@ export default function SohbaScreen({
                     m > 59
                   )
                     throw new Error("أدخل وقتًا صحيحًا");
-                  let pushToken = d.member.pushToken || null;
-                  if ((reminders || summary) && !pushToken)
-                    pushToken = await circlePushToken();
                   await api.preferences(d.circle.id, {
                     visible,
                     nameVisible,
                     reminders,
-                    summary,
                     reminderHour: h,
                     reminderMinute: m,
-                    pushToken,
                   });
                   await loadDetail(d.circle.id);
                   setPage("detail");

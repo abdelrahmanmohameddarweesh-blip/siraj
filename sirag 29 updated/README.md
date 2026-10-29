@@ -110,4 +110,4 @@ npx tsc --noEmit
 
 ## صحبة · customizable habit circles
 
-The homepage now includes **صحبة**: no-email create/join, 2–30 members, 1–90 days, configurable habits, names and progress visibility, invitation links/codes, encouragement and reminders. See [feature details and Firebase activation](docs/SOHBA.md). Live sharing requires deployment of the included Firebase backend; reminder delivery requires a native build.
+The homepage now includes **صحبة**: no-email create/join, 2–30 members, 1–90 days, configurable habits, names and progress visibility, invitation links/codes, encouragement and reminders. See [feature details and Firebase activation](docs/SOHBA.md). Live sharing now uses Firebase Spark directly: deploy Firestore rules only, keep billing disabled, and use local phone reminders. No Cloud Functions are included.
