@@ -3,8 +3,9 @@
   "supportEmail": "abdelrahman.mohamed.darweesh@gmail.com",
   "website": "https://batal-moslem.web.app",
   "policyUpdated": "2026-10-29",
-  "audience": "children-and-families",
+  "audience": "ages-13-and-older",
   "liveAdsApproved": false,
-  "releaseScope": "pending-parental-scope",
-  "ownerReleaseApproved": false
+  "releaseScope": "full-features-13-plus",
+  "ownerReleaseApproved": false,
+  "minimumAge": 13
 }

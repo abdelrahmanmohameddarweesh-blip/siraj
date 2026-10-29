@@ -18,7 +18,7 @@ Keep your Quran, prayer, Athkar and memorization habits together in a calm Arabi
 
 Reading, prayer and habit completion are personal records, not an independent verification of worship. Notification delivery depends on device permissions, Focus/battery settings and operating-system behavior. Some Quran text and audio sources require an internet connection.
 
-The public-release feature set and children's privacy controls must be confirmed before this draft is submitted. Do not claim online circle sharing or live advertising is available in a family-local release.
+Intended for ages 13 and older. Final listing and privacy declarations require publisher review.
 
 SUPPORT
 abdelrahman.mohamed.darweesh@gmail.com

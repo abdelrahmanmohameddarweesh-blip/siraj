@@ -42,8 +42,8 @@ for (const route of ["privacy.html", "delete-account.html", "support.html"])
   );
 if (process.argv.includes("--public")) {
   check(
-    release.releaseScope !== "pending-parental-scope",
-    "Choose and implement the public family-release scope before publication",
+    release.releaseScope === "full-features-13-plus" && release.minimumAge === 13 && release.audience === "ages-13-and-older",
+    "Confirm the approved 13+ audience and full-feature release scope",
   );
   check(
     release.ownerReleaseApproved === true,
