@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Siraj | سراج",
+    "name": "سراج",
     "slug": "sirag",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -26,7 +26,7 @@
       ],
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/store/icon.png",
+        "foregroundImage": "./assets/store/adaptive-foreground.png",
         "backgroundColor": "#082B2A"
       },
       "blockedPermissions": [

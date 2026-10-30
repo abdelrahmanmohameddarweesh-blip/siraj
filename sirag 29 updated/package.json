@@ -13,7 +13,8 @@
     "build:oasis": "python3 scripts/build-oasis-html.py prototype/sirag-oasis.html src/oasis/oasisHtml.ts",
     "web:preview": "npx expo export -p web --output-dir dist-web && npx serve dist-web",
     "play:check": "node scripts/check-play-release.cjs",
-    "play:public-check": "node scripts/check-play-release.cjs --public"
+    "play:public-check": "node scripts/check-play-release.cjs --public",
+    "build:icons": "node scripts/build-icons.cjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",
