@@ -27,6 +27,10 @@ In Play Console, select the actual intended age groups: 13–15, 16–17 and 18+
 
 Live ads remain off. Existing conservative SDK child/under-age flags are intentionally retained until an appropriate age/consent design is reviewed; 13+ does not mean every user is above every region's consent age. Do not simply mark all users as adults. Review these flags, the SDK's current policy requirements and actual native behavior before enabling ads.
 
+## Android startup recovery
+
+Version 1.0.0 (2) crashes in native WorkManager database initialization on the owner's Nothing Phone (2). A recovery build configuration is prepared; it still requires an EAS rebuild and an on-device launch test. See [ANDROID-STARTUP-RECOVERY.md](ANDROID-STARTUP-RECOVERY.md). Do not promote the failing internal build to production.
+
 ## Local package checks
 
 ```sh

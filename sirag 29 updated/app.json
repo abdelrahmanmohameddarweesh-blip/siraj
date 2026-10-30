@@ -60,6 +60,16 @@
           ],
           "color": "#1d5c49"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": false,
+            "enableShrinkResourcesInReleaseBuilds": false,
+            "extraProguardRules": "# Room creates WorkDatabase_Impl by name during Android startup.\n-keep class androidx.work.impl.WorkDatabase { *; }\n-keep class androidx.work.impl.WorkDatabase_Impl { *; }\n-keep class * extends androidx.room.RoomDatabase { *; }"
+          }
+        }
       ]
     ],
     "scheme": "sirag",
