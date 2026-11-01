@@ -1,3 +1,4 @@
+import { personalizeBody } from './personalization';
 /**
  * Pure planner for every local notification the app sends (prayers + habits).
  * The scheduler turns this list into real notifications; keeping it pure makes it testable.
@@ -28,6 +29,8 @@ export type Planned = {
   data: Record<string, string>;
 };
 export type PlanInput = {
+  displayName?: string;
+  personalizedNotifications?: boolean;
   now: Date;
   days: DayTimes[];
   prayer: PrayerSettings;
@@ -96,7 +99,7 @@ export function buildSchedule(input: PlanInput): Planned[] {
     }
   }
   const limit = input.limit ?? 60; // iOS keeps at most 64 pending notifications
-  return out.filter(n => n.at.getTime() > nowMs).sort((a, b) => a.at.getTime() - b.at.getTime()).slice(0, limit);
+  return out.map(n => ({ ...n, body: personalizeBody(n.body, input.displayName, input.personalizedNotifications !== false) })).filter(n => n.at.getTime() > nowMs).sort((a, b) => a.at.getTime() - b.at.getTime()).slice(0, limit);
 }
 
 /** Where tapping a notification should take the user. */

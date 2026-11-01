@@ -1,3 +1,4 @@
+import { refreshAuxiliaryNotificationNames } from "../notifications/personalizationStore";
 import { DeviceEventEmitter } from "react-native";
 import { doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore";
 import app from "../firebase/init";
@@ -25,6 +26,7 @@ export async function saveProfile(name: string, gender: Gender) {
     }),
   );
   DeviceEventEmitter.emit("siraj-profile-updated");
+  void refreshAuxiliaryNotificationNames().catch(() => {});
   return profile!;
 }
 let syncing: Promise<boolean> | null = null;

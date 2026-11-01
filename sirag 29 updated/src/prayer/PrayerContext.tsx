@@ -1,3 +1,4 @@
+import { refreshAuxiliaryNotificationNames } from "../notifications/personalizationStore";
 import type { PersonalProfile } from "../profile/profileModel";
 import React, {
   createContext,
@@ -99,10 +100,12 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
   const [isFemale, setIsFemale] = useState(false);
   useEffect(() => {
     const refresh = () => {
-      void readJSON<PersonalProfile | null>(
-        "sirag-personal-profile-v1",
-        null,
-      ).then((p) => setIsFemale(p?.gender === "female"));
+      void readJSON<PersonalProfile | null>("sirag-personal-profile-v1", null)
+        .then((p) => {
+          setIsFemale(p?.gender === "female");
+          syncNotificationsSoon();
+        })
+        .catch(() => {});
     };
     refresh();
     const sub = DeviceEventEmitter.addListener(
@@ -251,6 +254,9 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
       const base = notificationConfig || (await getNotificationConfig());
       const updated = { ...base, ...cfg };
       await saveNotificationConfig(updated);
+      setNotificationConfig(updated);
+      if (cfg.personalizedNotifications !== undefined)
+        await refreshAuxiliaryNotificationNames();
       if (cfg.reminderIntensity && cfg.reminderIntensity !== "custom")
         await updateJSON<any[]>("sirag-habit-plans-v1", [], (plans) =>
           plans.map((p) =>
@@ -263,7 +269,6 @@ export function PrayerProvider({ children }: { children: React.ReactNode }) {
               : p,
           ),
         );
-      setNotificationConfig(updated);
     },
     [notificationConfig],
   );

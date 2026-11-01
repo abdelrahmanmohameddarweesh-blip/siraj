@@ -1,3 +1,4 @@
+import { personalizedBody } from "../notifications/personalizationStore";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -60,13 +61,21 @@ async function scheduleNudge(state: any) {
       : res.includes("butterflies")
         ? "الفراشات ما زالت تحوم حول أزهارك 🦋"
         : "واحتك تنتظر أثرك اليوم 🌱";
+    const reminderAt = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
     await Notifications.scheduleNotificationAsync({
       identifier: NUDGE_ID,
-      content: { title: "سراج", body },
+      content: {
+        title: "سراج",
+        body: await personalizedBody(body),
+        data: {
+          type: "oasis",
+          personalizationBody: body,
+          personalizationAt: reminderAt.toISOString(),
+        },
+      },
       trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
-        seconds: 2 * 24 * 60 * 60,
-        repeats: false,
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: reminderAt,
       },
     });
   } catch {
@@ -201,7 +210,10 @@ export default function OasisScreen({ navigation }: any) {
       navigation.navigate("QuranReader");
       return;
     }
-    if (h.planId === 'sunnah') { navigation.navigate('Sunnah'); return; }
+    if (h.planId === "sunnah") {
+      navigation.navigate("Sunnah");
+      return;
+    }
     const mark = async () => {
       const day = localDay();
       const logs = await readJSON<Record<string, Record<string, number>>>(

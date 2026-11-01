@@ -19,6 +19,7 @@ import {
   PrayerId,
   DEFAULT_FOLLOW_UP,
 } from "./schedulePlan";
+import { refreshAuxiliaryNotificationNames } from "./personalizationStore";
 import { syncNotifications } from "./scheduler";
 import {
   prayerPresetPatch,
@@ -78,7 +79,11 @@ export default function PrayerRemindersScreen({ navigation, route }: any) {
     run(async () => {
       await updateNotifications({
         ...patch,
-        reminderIntensity: patch.reminderIntensity || "custom",
+        reminderIntensity:
+          patch.reminderIntensity ||
+          ("personalizedNotifications" in patch
+            ? config.reminderIntensity
+            : "custom"),
       });
       report("حُفظت الإعدادات. اضغط تحديث الجدول للتحقق من التنبيهات.");
     });
@@ -107,6 +112,7 @@ export default function PrayerRemindersScreen({ navigation, route }: any) {
             .granted;
       }
       await syncNotifications(true, true);
+      await refreshAuxiliaryNotificationNames();
       const list = await Notifications.getAllScheduledNotificationsAsync();
       const count = list.filter((n) =>
         /^(pre:|athan:|pfu:)/.test(n.identifier),
@@ -319,6 +325,23 @@ export default function PrayerRemindersScreen({ navigation, route }: any) {
                 : void update({ notificationsEnabled: false })
             }
           />
+        </View>
+        <View style={s.card}>
+          <View style={s.row}>
+            <Text style={s.label}>اذكر اسمي في التنبيهات</Text>
+            <Switch
+              accessibilityLabel="ذكر اسمي في التنبيهات"
+              disabled={busy}
+              value={config.personalizedNotifications !== false}
+              onValueChange={(personalizedNotifications) =>
+                void update({ personalizedNotifications })
+              }
+            />
+          </View>
+          <Text style={s.note}>
+            يُستخدم الاسم المحفوظ على جهازك فقط لتخصيص الرسالة. قد يظهر على شاشة
+            القفل؛ أوقف هذا الخيار إذا رغبت بإخفائه.
+          </Text>
         </View>
         <Text style={s.label}>وتيرة خطة الصلاة</Text>
         <View style={s.wrap}>

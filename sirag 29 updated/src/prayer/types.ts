@@ -35,6 +35,7 @@ export interface PrayerTimesDay {
 
 export interface PrayerNotificationConfig {
   notificationsEnabled: boolean;
+  personalizedNotifications?: boolean;
   reminderIntensity?: 'gentle' | 'steady' | 'strong' | 'custom';
   adjustments?: Partial<Record<'fajr' | 'dhuhr' | 'asr' | 'maghrib' | 'isha', number>>;
   fajr: { enabled: boolean; offsetMinutes: number; sound: boolean; athanEnabled?: boolean };

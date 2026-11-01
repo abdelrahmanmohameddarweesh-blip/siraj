@@ -57,10 +57,10 @@ export async function planNow(now = new Date()): Promise<Planned[]> {
   const [loc, method, madhab, config, plans, logs, checkins, restDays, profile] = await Promise.all([
     getSavedLocation(), getSavedCalculationMethod(), getSavedMadhab(), read<PrayerNotificationConfig | null>(CONFIG_KEY, null),
     read<HabitPlan[]>(PLANS_KEY, []), read<Record<string, Record<string, number>>>(LOG_KEY, {}),
-    read<Record<string, { status?: string }>>('batl-prayer-checkin-records-v1', {}), read<string[]>('batl-prayer-rest-days-v1', []), read<{ gender?: string } | null>('sirag-personal-profile-v1', null),
+    read<Record<string, { status?: string }>>('batl-prayer-checkin-records-v1', {}), read<string[]>('batl-prayer-rest-days-v1', []), read<{ gender?: string; name?: string } | null>('sirag-personal-profile-v1', null),
   ]);
   const days = calculateRollingWeek(loc, now, 7, method, madhab, config?.adjustments);
-  return buildSchedule({ now, days, prayer: settingsFromConfig(config), limit: Platform.OS === 'ios' ? 60 : 400, plans, logs, checkins, restDays: profile?.gender === 'female' ? restDays : [] });
+  return buildSchedule({ now, days, displayName: profile?.name, personalizedNotifications: config?.personalizedNotifications, prayer: settingsFromConfig(config), limit: Platform.OS === 'ios' ? 60 : 400, plans, logs, checkins, restDays: profile?.gender === 'female' ? restDays : [] });
 }
 
 let running: Promise<void> | null = null;

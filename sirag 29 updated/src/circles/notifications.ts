@@ -1,3 +1,4 @@
+import { personalizedBody } from "../notifications/personalizationStore";
 /** Local phone notifications only. No Expo push tokens, server or billing plan. */
 import { circleReminderDates } from "./reminderPlan";
 import { localDay } from "../habits/habitData";
@@ -75,7 +76,7 @@ export async function configureCircleReminder(
   const all = await Notifications.getAllScheduledNotificationsAsync();
   const capacity = Math.max(
     0,
-    60 -
+    (Platform.OS === "ios" ? 60 : 400) -
       all.filter((n) => !(old.notificationIds || []).includes(n.identifier))
         .length,
   );
@@ -91,11 +92,19 @@ export async function configureCircleReminder(
     )) {
       planned.push(
         await Notifications.scheduleNotificationAsync({
+          identifier: `sohba:${uid}:${id}:${when.getTime()}:${Math.random().toString(36).slice(2, 10)}`,
           content: {
             title: `صحبة · ${name}`,
-            body: "خطوة صغيرة لعادتك اليوم. رفاقك يشجّعونك.",
+            body: await personalizedBody(
+              "خطوة صغيرة لعادتك اليوم. رفاقك يشجّعونك.",
+            ),
             sound: "default",
-            data: { screen: "Sohba", circleId: id },
+            data: {
+              screen: "Sohba",
+              circleId: id,
+              personalizationBody: "خطوة صغيرة لعادتك اليوم. رفاقك يشجّعونك.",
+              personalizationAt: when.toISOString(),
+            },
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
