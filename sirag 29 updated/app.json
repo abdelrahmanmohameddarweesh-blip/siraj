@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "سراج",
+    "name": "Siraj",
     "slug": "sirag",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -43,7 +43,21 @@
     },
     "plugins": [
       "expo-font",
-      "expo-localization",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": {
+            "android": [
+              "en",
+              "ar"
+            ],
+            "ios": [
+              "en",
+              "ar"
+            ]
+          }
+        }
+      ],
       [
         "expo-audio",
         {
@@ -79,6 +93,10 @@
       "eas": {
         "projectId": "81f1357d-c55c-49b1-bec8-e251d6143ce2"
       }
+    },
+    "locales": {
+      "en": "./locales/en.json",
+      "ar": "./locales/ar.json"
     }
   }
 }

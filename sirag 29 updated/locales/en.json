@@ -1,0 +1,9 @@
+{
+  "android": {
+    "app_name": "Siraj"
+  },
+  "ios": {
+    "CFBundleDisplayName": "Siraj",
+    "CFBundleName": "Siraj"
+  }
+}

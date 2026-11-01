@@ -268,6 +268,7 @@ export default function OasisScreen({ navigation }: any) {
                 JSON.stringify(snapshot),
               );
               stateRef.current = snapshot;
+              syncNotificationsSoon();
               const applied: string[] = Array.isArray(snapshot?.applied)
                 ? snapshot.applied
                 : [];

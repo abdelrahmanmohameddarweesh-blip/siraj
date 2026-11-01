@@ -1,5 +1,5 @@
 APP NAME
-Siraj | سراج
+Siraj
 
 SHORT DESCRIPTION
 Quran, prayer reminders and daily habits in a peaceful growing oasis.

@@ -1,105 +1,307 @@
+import { syncAppBadge } from "./badgeService";
+import { hasPlantableSeeds } from "./badgeModel";
 /** Applies the notification plan with expo-notifications. Only touches notifications it owns. */
-import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { calculateRollingWeek } from '../prayer/prayerTimesService';
-import { getSavedCalculationMethod, getSavedLocation, getSavedMadhab } from '../prayer/locationService';
-import { HabitPlan, LOG_KEY, PLANS_KEY } from '../habits/habitData';
-import { buildSchedule, DEFAULT_FOLLOW_UP, PRAYER_IDS, PrayerSettings, Planned } from './schedulePlan';
-import { reconcileSchedule } from './reconcileSchedule';
-import type { PrayerNotificationConfig } from '../prayer/types';
+import * as Notifications from "expo-notifications";
+import { Platform } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { calculateRollingWeek } from "../prayer/prayerTimesService";
+import {
+  getSavedCalculationMethod,
+  getSavedLocation,
+  getSavedMadhab,
+} from "../prayer/locationService";
+import { HabitPlan, LOG_KEY, PLANS_KEY } from "../habits/habitData";
+import {
+  buildSchedule,
+  DEFAULT_FOLLOW_UP,
+  PRAYER_IDS,
+  PrayerSettings,
+  Planned,
+} from "./schedulePlan";
+import { reconcileSchedule } from "./reconcileSchedule";
+import type { PrayerNotificationConfig } from "../prayer/types";
 
-const CONFIG_KEY = 'batl-prayer-notification-config-v1';
-const SIG_KEY = 'sirag-notif-signature-v2';
-const OWN = ['pre:', 'athan:', 'pfu:', 'hab:', 'habfu:'];
-export const CHANNELS = { athan: 'athan_v2', checkin: 'prayer_checkin', habits: 'habits', silent: 'prayer_silent' } as const;
+const CONFIG_KEY = "batl-prayer-notification-config-v1";
+const SIG_KEY = "sirag-notif-signature-v2";
+const OWN = ["pre:", "athan:", "pfu:", "hab:", "habfu:", "att:"];
+export const CHANNELS = {
+  athan: "athan_v2",
+  checkin: "prayer_checkin",
+  habits: "habits",
+  silent: "prayer_silent",
+  attention: "pending-actions-v1",
+} as const;
 
 async function read<T>(key: string, fallback: T): Promise<T> {
-  try { const raw = await AsyncStorage.getItem(key); return raw ? (JSON.parse(raw) as T) : fallback; } catch { return fallback; }
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
 }
 
-export function settingsFromConfig(c: Partial<PrayerNotificationConfig> | null): PrayerSettings {
-  const per = {} as PrayerSettings['perPrayer'];
-  for (const p of PRAYER_IDS) per[p] = { enabled: (c as any)?.[p]?.enabled ?? true, sound: (c as any)?.[p]?.sound ?? true, athanEnabled: (c as any)?.[p]?.athanEnabled ?? true };
+export function settingsFromConfig(
+  c: Partial<PrayerNotificationConfig> | null,
+): PrayerSettings {
+  const per = {} as PrayerSettings["perPrayer"];
+  for (const p of PRAYER_IDS)
+    per[p] = {
+      enabled: (c as any)?.[p]?.enabled ?? true,
+      sound: (c as any)?.[p]?.sound ?? true,
+      athanEnabled: (c as any)?.[p]?.athanEnabled ?? true,
+    };
   return {
-    enabled: c?.notificationsEnabled ?? true, perPrayer: per,
+    enabled: c?.notificationsEnabled ?? true,
+    perPrayer: per,
     followUp: c?.checkinFollowUpEnabled ?? true,
     followUpMin: { ...DEFAULT_FOLLOW_UP, ...(c?.followUpMin || {}) },
-    preAlertMin: c?.preAlertMin ?? 0, preAlertByPrayer: c?.preAlertByPrayer,
-    quietEnabled: c?.quietHoursEnabled ?? true, quietStart: c?.quietHoursStart || '23:00', quietEnd: c?.quietHoursEnd || '04:30',
+    preAlertMin: c?.preAlertMin ?? 0,
+    preAlertByPrayer: c?.preAlertByPrayer,
+    quietEnabled: c?.quietHoursEnabled ?? true,
+    quietStart: c?.quietHoursStart || "23:00",
+    quietEnd: c?.quietHoursEnd || "04:30",
   };
 }
-export async function loadPrayerSettings(): Promise<PrayerSettings> { return settingsFromConfig(await read<PrayerNotificationConfig | null>(CONFIG_KEY, null)); }
-
-export async function ensureChannels() {
-  if (Platform.OS === 'web') return;
-  await Notifications.setNotificationCategoryAsync('PRAYER_CHECKIN_CATEGORY', [{ identifier: 'CHECKIN_OPEN', buttonTitle: 'سجّل الصلاة', options: { opensAppToForeground: true } }]);
-  if (Platform.OS !== 'android') return;
-  // Android fixes a channel's sound when it is created, so the adhan gets its own channel.
-  await Notifications.setNotificationChannelAsync(CHANNELS.athan, { name: 'الأذان', importance: Notifications.AndroidImportance.HIGH, sound: 'athan.wav', vibrationPattern: [0, 300, 200, 300] });
-  await Notifications.setNotificationChannelAsync(CHANNELS.silent, { name: 'مواقيت الصلاة بدون صوت', importance: Notifications.AndroidImportance.HIGH, sound: null });
-  await Notifications.setNotificationChannelAsync(CHANNELS.checkin, { name: 'تفقّد الصلاة', importance: Notifications.AndroidImportance.DEFAULT });
-  await Notifications.setNotificationChannelAsync(CHANNELS.habits, { name: 'تذكير العادات', importance: Notifications.AndroidImportance.DEFAULT });
+export async function loadPrayerSettings(): Promise<PrayerSettings> {
+  return settingsFromConfig(
+    await read<PrayerNotificationConfig | null>(CONFIG_KEY, null),
+  );
 }
 
-export async function hasPermission() { try { return (await Notifications.getPermissionsAsync()).granted; } catch { return false; } }
+export async function ensureChannels() {
+  if (Platform.OS === "web") return;
+  await Notifications.setNotificationCategoryAsync("PRAYER_CHECKIN_CATEGORY", [
+    {
+      identifier: "CHECKIN_OPEN",
+      buttonTitle: "سجّل الصلاة",
+      options: { opensAppToForeground: true },
+    },
+  ]);
+  if (Platform.OS !== "android") return;
+  // Android fixes a channel's sound when it is created, so the adhan gets its own channel.
+  await Notifications.setNotificationChannelAsync(CHANNELS.athan, {
+    name: "الأذان",
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: "athan.wav",
+    vibrationPattern: [0, 300, 200, 300],
+  });
+  await Notifications.setNotificationChannelAsync(CHANNELS.silent, {
+    name: "مواقيت الصلاة بدون صوت",
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: null,
+  });
+  await Notifications.setNotificationChannelAsync(CHANNELS.checkin, {
+    name: "تفقّد الصلاة",
+    importance: Notifications.AndroidImportance.DEFAULT,
+  });
+  await Notifications.setNotificationChannelAsync(CHANNELS.attention, {
+    name: "أعمال بانتظارك · شارة التطبيق",
+    importance: Notifications.AndroidImportance.LOW,
+    sound: null,
+    vibrationPattern: [],
+    showBadge: true,
+  });
+  await Notifications.setNotificationChannelAsync(CHANNELS.habits, {
+    name: "تذكير العادات",
+    importance: Notifications.AndroidImportance.DEFAULT,
+  });
+}
+
+export async function hasPermission() {
+  try {
+    return (await Notifications.getPermissionsAsync()).granted;
+  } catch {
+    return false;
+  }
+}
 export async function requestPermissionAndSync(): Promise<boolean> {
   try {
     await ensureChannels();
     let st = await Notifications.getPermissionsAsync();
-    if (!st.granted && st.canAskAgain) st = await Notifications.requestPermissionsAsync();
-    if (st.granted) { await ensureChannels(); await syncNotifications(true); }
+    if (!st.granted && st.canAskAgain)
+      st = await Notifications.requestPermissionsAsync();
+    if (st.granted) {
+      await ensureChannels();
+      await syncNotifications(true);
+    }
     return st.granted;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 export async function planNow(now = new Date()): Promise<Planned[]> {
-  const [loc, method, madhab, config, plans, logs, checkins, restDays, profile] = await Promise.all([
-    getSavedLocation(), getSavedCalculationMethod(), getSavedMadhab(), read<PrayerNotificationConfig | null>(CONFIG_KEY, null),
-    read<HabitPlan[]>(PLANS_KEY, []), read<Record<string, Record<string, number>>>(LOG_KEY, {}),
-    read<Record<string, { status?: string }>>('batl-prayer-checkin-records-v1', {}), read<string[]>('batl-prayer-rest-days-v1', []), read<{ gender?: string; name?: string } | null>('sirag-personal-profile-v1', null),
+  const [
+    loc,
+    method,
+    madhab,
+    config,
+    plans,
+    logs,
+    checkins,
+    restDays,
+    profile,
+    oasis,
+  ] = await Promise.all([
+    getSavedLocation(),
+    getSavedCalculationMethod(),
+    getSavedMadhab(),
+    read<PrayerNotificationConfig | null>(CONFIG_KEY, null),
+    read<HabitPlan[]>(PLANS_KEY, []),
+    read<Record<string, Record<string, number>>>(LOG_KEY, {}),
+    read<Record<string, { status?: string }>>(
+      "batl-prayer-checkin-records-v1",
+      {},
+    ),
+    read<string[]>("batl-prayer-rest-days-v1", []),
+    read<{ gender?: string; name?: string } | null>(
+      "sirag-personal-profile-v1",
+      null,
+    ),
+    read<any>("sirag-oasis-state-v1", null),
   ]);
-  const days = calculateRollingWeek(loc, now, 7, method, madhab, config?.adjustments);
-  return buildSchedule({ now, days, displayName: profile?.name, personalizedNotifications: config?.personalizedNotifications, prayer: settingsFromConfig(config), limit: Platform.OS === 'ios' ? 60 : 400, plans, logs, checkins, restDays: profile?.gender === 'female' ? restDays : [] });
+  const days = calculateRollingWeek(
+    loc,
+    now,
+    7,
+    method,
+    madhab,
+    config?.adjustments,
+  );
+  return buildSchedule({
+    now,
+    days,
+    badgesEnabled: config?.badgesEnabled !== false && !!profile,
+    canPlant: hasPlantableSeeds(oasis),
+    displayName: profile?.name,
+    personalizedNotifications: config?.personalizedNotifications,
+    prayer: settingsFromConfig(config),
+    limit: Platform.OS === "ios" ? 60 : 400,
+    plans,
+    logs,
+    checkins,
+    restDays: profile?.gender === "female" ? restDays : [],
+  });
 }
 
 let running: Promise<void> | null = null;
 let resync = false;
-export async function syncNotifications(force = false, strict = false): Promise<void> {
-  if (running) { if (!strict) { resync = true; return running; } await running; if (running) await running; return syncNotifications(force, strict); }
+export async function syncNotifications(
+  force = false,
+  strict = false,
+): Promise<void> {
+  if (running) {
+    if (!strict) {
+      resync = true;
+      return running;
+    }
+    await running;
+    if (running) await running;
+    return syncNotifications(force, strict);
+  }
   running = (async () => {
     try {
+      await syncAppBadge();
       if (!(await hasPermission())) return;
       await ensureChannels();
       const existing = await Notifications.getAllScheduledNotificationsAsync();
-      const owned = existing.filter(n => OWN.some(p => n.identifier.startsWith(p)));
+      const owned = existing.filter((n) =>
+        OWN.some((p) => n.identifier.startsWith(p)),
+      );
       // Reserve capacity for other app features before reconciling our requests.
-      const capacity = Math.max(0, (Platform.OS === 'ios' ? 60 : 400) - (existing.length - owned.length));
-      const exact = Platform.OS !== 'android' || (await Notifications.getExactAlarmPermissionsAsync()).granted;
+      const capacity = Math.max(
+        0,
+        (Platform.OS === "ios" ? 60 : 400) - (existing.length - owned.length),
+      );
+      const exact =
+        Platform.OS !== "android" ||
+        (await Notifications.getExactAlarmPermissionsAsync()).granted;
       // Include delivery mode in the signature so granting exact-alarm access
       // upgrades already scheduled best-effort adhans instead of retaining them.
-      const planned = (await planNow()).slice(0, capacity).map(n => n.data.type === 'prayer_athan' ? { ...n, data: { ...n.data, deliveryMode: exact ? 'alarmClock' : 'bestEffort' } } : n);
+      const planned = (await planNow()).slice(0, capacity).map((n) =>
+        n.data.type === "prayer_athan"
+          ? {
+              ...n,
+              data: {
+                ...n.data,
+                deliveryMode: exact ? "alarmClock" : "bestEffort",
+              },
+            }
+          : n,
+      );
       const sig = JSON.stringify(planned);
       const stored = await AsyncStorage.getItem(SIG_KEY);
-      if (!force && sig === stored && owned.length === planned.length && planned.every(n => owned.some(e => e.identifier === n.id))) return;
+      if (
+        !force &&
+        sig === stored &&
+        owned.length === planned.length &&
+        planned.every((n) => owned.some((e) => e.identifier === n.id))
+      )
+        return;
       let previous: unknown[] = [];
-      try { const parsed = JSON.parse(stored || '[]'); if (Array.isArray(parsed)) previous = parsed; } catch { /* previous format is replaced once */ }
-      const changes = reconcileSchedule(previous, planned, owned.map(n => n.identifier));
-      await Promise.all(changes.cancel.map(id => Notifications.cancelScheduledNotificationAsync(id)));
+      try {
+        const parsed = JSON.parse(stored || "[]");
+        if (Array.isArray(parsed)) previous = parsed;
+      } catch {
+        /* previous format is replaced once */
+      }
+      const changes = reconcileSchedule(
+        previous,
+        planned,
+        owned.map((n) => n.identifier),
+      );
+      await Promise.all(
+        changes.cancel.map((id) =>
+          Notifications.cancelScheduledNotificationAsync(id),
+        ),
+      );
       for (const n of changes.schedule) {
         if (n.at.getTime() <= Date.now()) continue;
         await Notifications.scheduleNotificationAsync({
           identifier: n.id,
-          content: { title: n.title, body: n.body, data: n.data, ...(n.data.type === 'prayer_checkin' ? { categoryIdentifier: 'PRAYER_CHECKIN_CATEGORY' } : {}), sound: n.sound === 'athan' ? 'athan.wav' : n.sound ? true : false },
-          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: n.at, channelId: CHANNELS[n.channel], delivery: n.data.deliveryMode === 'alarmClock' ? 'alarmClock' : 'bestEffort' },
+          content: {
+            ...(n.channel === "attention" && Platform.OS === "ios"
+              ? {}
+              : { title: n.title, body: n.body }),
+            data: n.data,
+            ...(n.badge === undefined ? {} : { badge: n.badge }),
+            ...(n.data.type === "prayer_checkin"
+              ? { categoryIdentifier: "PRAYER_CHECKIN_CATEGORY" }
+              : {}),
+            sound: n.sound === "athan" ? "athan.wav" : n.sound ? true : false,
+          },
+          trigger: {
+            type: Notifications.SchedulableTriggerInputTypes.DATE,
+            date: n.at,
+            channelId: CHANNELS[n.channel],
+            delivery:
+              n.data.deliveryMode === "alarmClock"
+                ? "alarmClock"
+                : "bestEffort",
+          },
         });
       }
       await AsyncStorage.setItem(SIG_KEY, sig);
-    } catch (e) { console.warn('[notifications] sync failed', e); if (strict) throw e; }
-    finally { running = null; if (resync) { resync = false; void syncNotifications(true); } }
+    } catch (e) {
+      console.warn("[notifications] sync failed", e);
+      if (strict) throw e;
+    } finally {
+      running = null;
+      if (resync) {
+        resync = false;
+        void syncNotifications(true);
+      }
+    }
   })();
   return running;
 }
 let timer: ReturnType<typeof setTimeout> | null = null;
 /** Call after anything that changes the plan: a check-in, a habit log, a new plan, a city change. */
-export function syncNotificationsSoon() { if (timer) clearTimeout(timer); timer = setTimeout(() => { timer = null; syncNotifications(); }, 800); }
+export function syncNotificationsSoon() {
+  if (timer) clearTimeout(timer);
+  timer = setTimeout(() => {
+    timer = null;
+    syncNotifications();
+  }, 800);
+}

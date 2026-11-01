@@ -123,6 +123,8 @@ export async function deleteSirajAccount(password: string) {
       device: async () => {
         if (Platform.OS !== "web") {
           await Notifications.cancelAllScheduledNotificationsAsync();
+          await Notifications.dismissAllNotificationsAsync().catch(() => {});
+          await Notifications.setBadgeCountAsync(0).catch(() => false);
           await Notifications.clearLastNotificationResponseAsync().catch(
             () => {},
           );

@@ -6,7 +6,7 @@ The owner has an existing Play developer account, so this workflow does not need
 
 Prepared in source:
 
-- Installed app label `سراج`, store listing title `Siraj | سراج`, version `1.0.0`, initial Android versionCode `1`.
+- Installed app label localized as `Siraj` / `سراج` by phone language, store listing translations managed separately, version `1.0.0`, initial Android versionCode `1`.
 - Android package `com.sirag.livingdesert`. Confirm this before the first upload; a published app's package is permanent. If it already exists in your Play Console, keep its existing signing/upload-key setup and increment its version code.
 - Original generated lantern icon and a 512×512 Play icon export; 1024×500 feature graphic.
 - `play-internal` / `production` EAS profiles produce an Android App Bundle (.aab). They use remote build-number increments. Internal builds use test ads; production uses live Android rewarded ads and live banners when the separate banner ID has been supplied.
@@ -33,9 +33,9 @@ Version 1.0.0 (2) crashes in native WorkManager database initialization on the o
 
 ## Name and icon update
 
-The owner confirmed that recovery build version code 3 starts successfully. Keep the Android startup recovery configuration. The new launcher label is `سراج`. The app uses a new gold lantern icon on midnight teal, with a transparent adaptive foreground and a separate opaque Play icon. `npm run build:icons` regenerates the size-specific assets from the master.
+The owner confirmed that recovery build version code 3 starts successfully. Keep the Android startup recovery configuration. The launcher label is localized: `سراج` on Arabic devices and `Siraj` on English devices, with English fallback. The app uses a new gold lantern icon on midnight teal, with a transparent adaptive foreground and a separate opaque Play icon. `npm run build:icons` regenerates the size-specific assets from the master.
 
-Installed app labels and icons require a new native AAB; the existing EAS project, Android package and remote signing key stay unchanged. Update the installed test app through Play after uploading the next build. In Play Console, edit Grow users → Store presence → Main store listing (or the current equivalent): set the Arabic title to `سراج | Siraj`, English title to `Siraj | سراج`, and upload `store-listing/icon-512.png`. The temporary `com.sirag.livingdesert (unreviewed)` internal-test listing is controlled by Google and may remain until initial listing review; changing the binary does not force it to disappear. Store metadata does not automatically update from app.json.
+Installed app labels and icons require a new native AAB; the existing EAS project, Android package and remote signing key stay unchanged. Update the installed test app through Play after uploading the next build. In Play Console, edit Grow users → Store presence → Main store listing (or the current equivalent): set the Arabic title to `سراج`, English title to `Siraj`, and upload `store-listing/icon-512.png`. The temporary `com.sirag.livingdesert (unreviewed)` internal-test listing is controlled by Google and may remain until initial listing review; changing the binary does not force it to disappear. Store metadata does not automatically update from app.json.
 
 ## Local package checks
 

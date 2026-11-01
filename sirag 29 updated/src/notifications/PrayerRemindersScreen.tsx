@@ -81,7 +81,7 @@ export default function PrayerRemindersScreen({ navigation, route }: any) {
         ...patch,
         reminderIntensity:
           patch.reminderIntensity ||
-          ("personalizedNotifications" in patch
+          ("personalizedNotifications" in patch || "badgesEnabled" in patch
             ? config.reminderIntensity
             : "custom"),
       });
@@ -341,6 +341,22 @@ export default function PrayerRemindersScreen({ navigation, route }: any) {
           <Text style={s.note}>
             يُستخدم الاسم المحفوظ على جهازك فقط لتخصيص الرسالة. قد يظهر على شاشة
             القفل؛ أوقف هذا الخيار إذا رغبت بإخفائه.
+          </Text>
+        </View>
+        <View style={s.card}>
+          <View style={s.row}>
+            <Text style={s.label}>شارة الأعمال المنتظرة على أيقونة سراج</Text>
+            <Switch
+              accessibilityLabel="شارة أيقونة التطبيق"
+              disabled={busy}
+              value={config.badgesEnabled !== false}
+              onValueChange={(badgesEnabled) => void update({ badgesEnabled })}
+            />
+          </View>
+          <Text style={s.note}>
+            للصلوات التي تنتظر التسجيل بعد مهلة التذكير، وللبذور الجاهزة
+            للزراعة. على Android تعتمد النقطة على المشغّل وإشعار هادئ؛ لونها
+            وشكلها من إعدادات الهاتف.
           </Text>
         </View>
         <Text style={s.label}>وتيرة خطة الصلاة</Text>
