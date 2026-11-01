@@ -1,6 +1,6 @@
 # Data Safety / app-content working notes — not submitted answers
 
-The owner confirmed an intended audience aged **13 and older**, excluding under-13s. Keep profiles and online circles. This audience declaration is not age verification, and teenagers may have additional regional privacy rights. Live ads remain disabled pending separate review.
+The owner confirmed an intended audience aged **13 and older**, excluding under-13s. Keep profiles and online circles. This audience declaration is not age verification, and teenagers may have additional regional privacy rights. Production Android monetization is enabled in source at the owner's request; internal test builds use Google test IDs. Android banner unit `ca-app-pub-6157287197742359/1804274820` is configured.
 
 ## Current full implementation
 
@@ -10,7 +10,7 @@ The owner confirmed an intended audience aged **13 and older**, excluding under-
 - Circle metadata/invites: unlisted name, settings and anonymous membership identifiers; a valid invite joins a circle. Circle reporting stores user-entered report text and reporter UID. Preset encouragement is not open chat, but online sharing still requires privacy, reporting and safety review.
 - Location: optional coordinates for on-device prayer calculations. Google ad/media services receive network IP information; evaluate their own SDK disclosures separately. Do not promise zero collection merely because the app doesn't explicitly add targeting fields.
 - Notifications: local schedules, no server push token for circles. Exact alarm and foreground audio uses must match Android/Play declarations.
-- Google Mobile Ads: integrated but live ads disabled. Conservative child-directed/under-age, NPA and G flags remain until age/consent behavior is reviewed. A 13+ audience does not establish that every user is above the local age of consent. Review the actual native SDK disclosures and applicable teen/ad policies before enabling ads.
+- Google Mobile Ads: integrated; production uses live Android rewarded ads, and two Athkar banners when a banner ID is configured. Internal builds use test ads. Conservative teen/under-age, NPA and G flags are applied; age/consent behavior still needs native verification. A 13+ audience does not establish that every user is above the local age of consent. Review the actual native SDK disclosures and applicable teen/ad policies before enabling ads.
 - External Quran providers: api.alquran.cloud, everyayah.com and cdn.mp3quran.net are used by current readers/audio. Inspect current traffic, terms and age suitability. Network services can receive IP/request information.
 
 ## Owner app-content decisions required

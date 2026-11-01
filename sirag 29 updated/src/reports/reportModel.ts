@@ -1,6 +1,7 @@
 import { HabitPlan, localDay } from '../habits/habitData';
 import { effectiveTarget } from '../habits/library';
-import { AthkarLog } from '../athkar/athkarEngine';
+import { ATHKAR } from '../athkar/athkarData';
+import { AthkarLog, normalizeSession } from '../athkar/athkarEngine';
 import { HifzState, addDays } from '../quran/hifz/hifzEngine';
 import { PrayerCheckinRecord } from '../prayer/types';
 import { PRAYER_IDS } from '../notifications/schedulePlan';
@@ -24,13 +25,13 @@ export function buildReport(source: ReportSources, dates: string[], now = new Da
     const counted = records.filter(r => r && COUNTED_PRAYERS.has(r.status));
     const rest = source.restDays.includes(day);
     const due = rest || day > today ? 0 : day < today || !todaysPrayerTimes ? 5 : PRAYER_IDS.filter(p => now >= todaysPrayerTimes[p]).length;
-    const plans = source.plans.filter(p => !['prayer','fajr'].includes(p.id) && p.kind !== 'prayers' && localDay(new Date(p.createdAt)) <= day && (p.frequency === 'daily' || new Date(day+'T12:00:00').getDay() === 5));
+    const plans = source.plans.filter(p => !['prayer','fajr'].includes(p.id) && p.kind !== 'prayers' && (!rest || p.category !== 'الصلاة') && localDay(new Date(p.createdAt)) <= day && (p.frequency === 'daily' || new Date(day+'T12:00:00').getDay() === 5));
     const dhikr = source.athkar[day];
     const result: DayReport = {
       day, prayers: counted.length, due: rest ? 0 : Math.max(due, counted.length), onTime: counted.filter(r => r.status === 'on_time').length,
       late: counted.filter(r => r.status === 'late').length, qada: counted.filter(r => r.status === 'qada').length,
       congregation: counted.filter(r => r.mode === 'jamaa').length, rest,
-      morning: !!dhikr?.morning?.done, evening: !!dhikr?.evening?.done,
+      morning: normalizeSession(dhikr?.morning, ATHKAR).done, evening: normalizeSession(dhikr?.evening, ATHKAR).done,
       dhikrSeconds: (dhikr?.morning?.seconds || 0) + (dhikr?.evening?.seconds || 0),
       pages: new Set(source.readDays[day] || []).size, listenSeconds: Math.max(0, Number(source.listening[day]) || 0),
       learned: Object.values(source.hifz?.items || {}).filter(item => item.learnedOn === day).length,

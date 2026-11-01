@@ -1,3 +1,5 @@
+import { ATHKAR } from "../athkar/athkarData";
+import { normalizeSession } from "../athkar/athkarEngine";
 import { localDay } from "../habits/habitData";
 import { addDays } from "../quran/hifz/hifzEngine";
 export const activityOptions = {
@@ -229,9 +231,9 @@ export function progressForHabit(
       ),
     ).length;
   if (activity === "adhkar_morning")
-    value = Number(!!source.athkar[day]?.morning?.done);
+    value = Number(normalizeSession(source.athkar[day]?.morning, ATHKAR).done);
   if (activity === "adhkar_evening")
-    value = Number(!!source.athkar[day]?.evening?.done);
+    value = Number(normalizeSession(source.athkar[day]?.evening, ATHKAR).done);
   if (activity === "hifz")
     value = Object.values(source.hifz?.items || {}).filter(
       (i) => i.learnedOn === day,

@@ -15,3 +15,6 @@ export async function showRewardedAd(
 export async function adPrivacyOptions() {
   throw new Error("خيارات خصوصية الإعلان متاحة في نسخة الهاتف المدعومة فقط.");
 }
+
+export async function prepareAds() { throw new Error(adSupport().message); }
+export function bannerSupport(): AdSupport & { unitId?: string } { return adSupport(); }

@@ -79,7 +79,7 @@ export function buildSchedule(input: PlanInput): Planned[] {
       }
     }
     for (const plan of input.plans) {
-      if (!plan?.reminders?.length || plan.kind === 'prayers') continue;
+      if (!plan?.reminders?.length || plan.kind === 'prayers' || (rest && plan.category === 'الصلاة')) continue;
       if (plan.frequency === 'weekly' && new Date(day.dateStr + 'T12:00:00').getDay() !== 5) continue; // weekly plans: Friday
       const target = effectiveTarget(plan, day.dateStr);
       const done = (input.logs[day.dateStr]?.[plan.id] || 0) >= target;
@@ -106,6 +106,7 @@ export function routeFor(data: Record<string, any> | undefined): { screen: strin
   if (data.type === 'prayer_athan' || data.type === 'prayer_pre') return { screen: 'PrayerTracker' };
   if (data.type === 'oasis') return { screen: 'Oasis' };
   if (data.type === 'habit') {
+    if (data.planId === 'sunnah') return { screen: 'Sunnah' };
     if (data.kind === 'adhkar_morning') return { screen: 'Adhkar', params: { session: 'morning' } };
     if (data.kind === 'adhkar_evening') return { screen: 'Adhkar', params: { session: 'evening' } };
     if (data.kind === 'hifz' || data.kind === 'hifz_review') return { screen: 'Hifz' };

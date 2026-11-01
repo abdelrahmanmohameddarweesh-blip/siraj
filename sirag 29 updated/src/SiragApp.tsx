@@ -29,6 +29,8 @@ import PrayerTrackerScreen from "./screens/PrayerTrackerScreen";
 import OasisScreen from "./oasis/OasisScreen";
 import OasisSplash from "./oasis/OasisSplash";
 
+import SunnahScreen from "./prayer/SunnahScreen";
+import AppTourScreen from "./onboarding/AppTourScreen";
 const Stack = createNativeStackNavigator();
 const navRef = createNavigationContainerRef<any>();
 const theme = {
@@ -148,6 +150,8 @@ export default function SiragApp() {
                   component={PrayerTrackerScreen}
                 />
                 <Stack.Screen name="Insights" component={InsightsScreen} />
+                <Stack.Screen name="AppTour" component={AppTourScreen} />
+                <Stack.Screen name="Sunnah" component={SunnahScreen} />
                 <Stack.Screen name="Adhkar" component={AthkarScreen} />
                 <Stack.Screen name="Hifz" component={HifzScreen} />
               </Stack.Navigator>

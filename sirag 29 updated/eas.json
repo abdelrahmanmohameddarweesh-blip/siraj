@@ -24,7 +24,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_ADS_MODE": "off"
+        "EXPO_PUBLIC_ADS_MODE": "live"
       }
     },
     "play-internal": {
@@ -34,7 +34,7 @@
         "buildType": "app-bundle"
       },
       "env": {
-        "EXPO_PUBLIC_ADS_MODE": "off"
+        "EXPO_PUBLIC_ADS_MODE": "test"
       }
     }
   },

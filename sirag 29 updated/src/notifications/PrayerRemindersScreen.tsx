@@ -1,47 +1,582 @@
-import React, { useState } from 'react';
-import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { usePrayer } from '../prayer/PrayerContext';
-import { PRAYER_AR, PRAYER_IDS, DEFAULT_FOLLOW_UP } from './schedulePlan';
-import { C, F, ar } from '../ui/theme';
-
+import React, { useState } from "react";
+import {
+  ActivityIndicator,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  View,
+} from "react-native";
+import * as Notifications from "expo-notifications";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { usePrayer } from "../prayer/PrayerContext";
+import {
+  PRAYER_AR,
+  PRAYER_IDS,
+  PrayerId,
+  DEFAULT_FOLLOW_UP,
+} from "./schedulePlan";
+import { syncNotifications } from "./scheduler";
+import {
+  prayerPresetPatch,
+  PrayerPreset,
+  followUpPatch,
+} from "./prayerPresets";
+import { formatPrayerClock } from "../prayer/prayerTimesService";
+import { PREDEFINED_CITIES } from "../prayer/cities";
+import { C, F, ar } from "../ui/theme";
+const METHODS = {
+  Egyptian: "الهيئة المصرية",
+  UmmAlQura: "أم القرى",
+  MuslimWorldLeague: "رابطة العالم الإسلامي",
+  NorthAmerica: "أمريكا الشمالية",
+  Karachi: "كراتشي",
+  Dubai: "دبي",
+  Qatar: "قطر",
+  Kuwait: "الكويت",
+} as const;
 export default function PrayerRemindersScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
-  const { notificationConfig: config, updateNotifications, requestNotifications, location, method } = usePrayer();
-  const [busy, setBusy] = useState(false);
-  const update = async (patch: Parameters<typeof updateNotifications>[0]) => {
-    if (busy) return; setBusy(true);
-    try { await updateNotifications(patch); } catch { Alert.alert('تعذّر الحفظ', 'حاول مرة أخرى.'); } finally { setBusy(false); }
+  const {
+    notificationConfig: config,
+    updateNotifications,
+    requestNotifications,
+    location,
+    method,
+    madhab,
+    todayTimes,
+    changeMethod,
+    changeMadhab,
+    changeCity,
+    detectLocation,
+  } = usePrayer();
+  const [busy, setBusy] = useState(false),
+    [expanded, setExpanded] = useState<PrayerId | null>(null),
+    [accuracy, setAccuracy] = useState(false),
+    [cities, setCities] = useState(false),
+    [message, setMessage] = useState(""),
+    [failed, setFailed] = useState(false);
+  const report = (text: string, error = false) => {
+    setMessage(text);
+    setFailed(error);
   };
-  const permission = async () => {
-    if (busy) return; setBusy(true);
-    try { if (!(await requestNotifications())) Alert.alert('التنبيهات غير مفعّلة', 'اسمح لسراج بإرسال التنبيهات من إعدادات الجهاز.', [{ text: 'لاحقًا' }, { text: 'الإعدادات', onPress: () => { void Linking.openSettings(); } }]); }
-    catch { Alert.alert('تعذّر تفعيل التنبيهات', 'لم نتمكن من حفظ إعدادات التنبيهات. حاول مرة أخرى.'); }
-    finally { setBusy(false); }
+  const run = async (action: () => Promise<unknown>) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await action();
+    } catch {
+      report("تعذّر حفظ الإعدادات أو تحديث الجدول. حاول مرة أخرى.", true);
+    } finally {
+      setBusy(false);
+    }
   };
-  const chips = (values: number[], current: number, onPress: (n: number) => void, off = true) => <View style={s.chips}>{values.map(n => <Pressable accessibilityRole="radio" accessibilityState={{ checked: n === current, disabled: busy }} disabled={busy} key={n} onPress={() => onPress(n)} style={[s.chip, n === current && s.chipOn]}><Text style={[s.chipText, n === current && { color: '#fff' }]}>{!n && off ? 'بدون' : ar(n) + ' د'}</Text></Pressable>)}</View>;
-  return <View style={[s.root, { paddingTop: insets.top }]}>
-    <View style={s.head}><Pressable onPress={() => route?.params?.nextRoute ? navigation.replace(route.params.nextRoute) : navigation.goBack()}><Text style={s.back}>{route?.params?.nextRoute ? 'تم' : 'رجوع'}</Text></Pressable><Text style={s.title}>رفيق صلاتك</Text></View>
-    <ScrollView contentContainerStyle={{ padding: 18, gap: 16, paddingBottom: insets.bottom + 30 }}>
-      <View style={s.hero}><Text style={s.heroTitle}>قبل الأذان، وفي وقته، وبعد الصلاة</Text><Text style={s.heroCopy}>اختر ما يناسب يومك. يتوقف سؤال المتابعة عندما تسجّل صلاتك.</Text><Text style={s.heroCopy}>المواقيت حسب {location.cityNameAr} · {method}</Text></View>
-      <View style={s.row}><Text style={s.label}>تفعيل تنبيهات الصلاة</Text><Switch disabled={busy} value={config.notificationsEnabled} onValueChange={value => value ? void permission() : void update({ notificationsEnabled: false })} /></View>
-      {PRAYER_IDS.map(p => {
-        const cfg = config[p]; const before = config.preAlertByPrayer?.[p] ?? config.preAlertMin ?? 0;
-        const after = config.checkinFollowUpEnabled ? config.followUpMin?.[p] ?? DEFAULT_FOLLOW_UP[p] : 0;
-        return <View style={s.card} key={p}>
-          <View style={s.row}><Text style={s.prayer}>{PRAYER_AR[p]}</Text><Switch disabled={busy} value={cfg.enabled} onValueChange={enabled => void update({ [p]: { ...cfg, enabled } })} /></View>
-          {cfg.enabled && <>
-            <Text style={s.label}>استعداد قبل الأذان</Text>{chips([0,5,10,15,20,30,60], before, n => void update({ preAlertByPrayer: { ...config.preAlertByPrayer, [p]: n } }))}
-            <View style={s.row}><Text style={s.label}>تنبيه عند دخول الوقت</Text><Switch disabled={busy} value={cfg.athanEnabled !== false} onValueChange={athanEnabled => void update({ [p]: { ...cfg, athanEnabled } })} /></View>
-            {cfg.athanEnabled !== false && <View style={s.row}><Text style={s.small}>صوت الأذان</Text><Switch disabled={busy} value={cfg.sound} onValueChange={sound => void update({ [p]: { ...cfg, sound } })} /></View>}
-            <Text style={s.label}>اسألني «هل صليت؟» بعد الأذان بـ</Text>{chips([0,15,20,30,35,45,60,90], after, n => void update({ followUpMin: { ...config.followUpMin, [p]: n }, checkinFollowUpEnabled: true }))}
-          </>}
-        </View>;
-      })}
-      <Pressable accessibilityRole="button" disabled={busy} onPress={permission} style={s.button}><Text style={s.buttonText}>السماح بالتنبيهات وتحديث الجدول</Text></Pressable>
-      <Text style={s.note}>{Platform.OS === 'web' ? 'تنبيهات الصلاة تعمل على الهاتف؛ متصفح الويب لا يرسل هذه التنبيهات.' : 'يُجدَّد الجدول عند فتح التطبيق وتغيير المدينة أو تسجيل الصلاة. افتح سراج يوميًا لاستمرار التذكيرات؛ عدد التنبيهات المعلّقة محدود على iPhone.'}</Text>
-      <Text style={s.note}>صوت الأذان المخصص في الخلفية يحتاج نسخة مثبتة من سراج، ولا يمكن اختباره بالكامل في Expo Go. صوت التنبيه على iPhone مقطع أقصر من ٣٠ ثانية؛ الأذان الكامل داخل التطبيق. وضع الصامت والتركيز وإعدادات النظام قد تمنع الصوت أو تؤخر التنبيه.</Text>
+  const update = (patch: Parameters<typeof updateNotifications>[0]) =>
+    run(async () => {
+      await updateNotifications({
+        ...patch,
+        reminderIntensity: patch.reminderIntensity || "custom",
+      });
+      report("حُفظت الإعدادات. اضغط تحديث الجدول للتحقق من التنبيهات.");
+    });
+  const permission = () =>
+    run(async () => {
+      if (Platform.OS === "web") {
+        report(
+          "هذه معاينة ويب. فعّل التنبيهات من نسخة سراج المثبتة على الهاتف.",
+          true,
+        );
+        return;
+      }
+      if (!(await requestNotifications())) {
+        report(
+          "إذن التنبيهات غير مفعّل. افتح إعدادات الهاتف واسمح لسراج بإرسال التنبيهات.",
+          true,
+        );
+        return;
+      }
+      let exact = true;
+      if (Platform.OS === "android") {
+        const state = await Notifications.getExactAlarmPermissionsAsync();
+        exact = state.granted;
+        if (!exact && state.canAskAgain)
+          exact = (await Notifications.requestExactAlarmPermissionsAsync())
+            .granted;
+      }
+      await syncNotifications(true, true);
+      const list = await Notifications.getAllScheduledNotificationsAsync();
+      const count = list.filter((n) =>
+        /^(pre:|athan:|pfu:)/.test(n.identifier),
+      ).length;
+      report(
+        count
+          ? `تم تحديث الجدول ✓ ${ar(count)} تنبيه صلاة قادم.${exact ? "" : " فعّل «المنبّهات والتذكيرات» لدقة أفضل؛ التوقيت الآن تقريبي."}`
+          : "حُفظت الإعدادات، ولا توجد تنبيهات صلاة قادمة وفق اختياراتك. تحقق من تفعيل الصلوات أو العذر اليوم.",
+      );
+    });
+  const chips = (
+    values: number[],
+    current: number,
+    action: (n: number) => void,
+  ) => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={s.chips}
+    >
+      {values.map((n) => (
+        <Pressable
+          key={n}
+          disabled={busy}
+          accessibilityRole="radio"
+          accessibilityState={{ checked: n === current }}
+          onPress={() => action(n)}
+          style={[s.chip, n === current && s.chipOn]}
+        >
+          <Text style={[s.chipText, n === current && s.white]}>
+            {n ? `${ar(n)} د` : "بدون"}
+          </Text>
+        </Pressable>
+      ))}
     </ScrollView>
-  </View>;
+  );
+  return (
+    <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={s.head}>
+        <Pressable
+          accessibilityRole="button"
+          style={s.touch}
+          onPress={() =>
+            route?.params?.nextRoute
+              ? navigation.replace(route.params.nextRoute)
+              : navigation.goBack()
+          }
+        >
+          <Text style={s.link}>تم</Text>
+        </Pressable>
+        <Text style={s.title}>رفيق صلاتك</Text>
+      </View>
+      <ScrollView
+        contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 20 }}
+      >
+        <View style={s.hero}>
+          <Text style={s.heroTitle}>تذكير يناسب يومك</Text>
+          <Text style={s.heroCopy}>
+            الأذان حسب موقعك، وسؤال المتابعة يتوقف عند تسجيل الصلاة.
+          </Text>
+          <Text style={s.heroCopy}>
+            📍 {location.cityNameAr} · {METHODS[method]}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setAccuracy(!accuracy)}
+          style={s.card}
+        >
+          <View style={s.row}>
+            <Text style={s.label}>الموقع ودقة المواقيت</Text>
+            <Text style={s.link}>{accuracy ? "إخفاء −" : "ضبط +"}</Text>
+          </View>
+          <Text style={s.note}>
+            {location.isManual ? "مدينة مختارة يدويًا" : "موقع الجهاز"} ·{" "}
+            {location.latitude.toFixed(2)}, {location.longitude.toFixed(2)}
+          </Text>
+        </Pressable>
+        {accuracy && (
+          <View style={s.card}>
+            <Pressable
+              disabled={busy}
+              onPress={() =>
+                void run(async () => {
+                  const ok = await detectLocation();
+                  report(
+                    ok
+                      ? "تم تحديث الموقع والمواقيت ✓"
+                      : "لم نتمكن من تحديد الموقع. فعّل خدمة الموقع أو اختر مدينتك يدويًا.",
+                    !ok,
+                  );
+                })
+              }
+              style={s.secondary}
+            >
+              <Text style={s.label}>📍 استخدام موقعي الحالي</Text>
+            </Pressable>
+            <Pressable onPress={() => setCities(!cities)} style={s.secondary}>
+              <Text style={s.label}>اختيار مدينة يدويًا</Text>
+            </Pressable>
+            {cities && (
+              <View style={s.wrap}>
+                {PREDEFINED_CITIES.map((city) => (
+                  <Pressable
+                    disabled={busy}
+                    key={city.id}
+                    onPress={() =>
+                      void run(async () => {
+                        await changeCity(city);
+                        setCities(false);
+                        report("تم تغيير المدينة.");
+                      })
+                    }
+                    style={s.chip}
+                  >
+                    <Text style={s.chipText}>{city.cityNameAr}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            <Text style={s.label}>طريقة الحساب المعتمدة في بلدك</Text>
+            <View style={s.wrap}>
+              {Object.entries(METHODS).map(([id, label]) => (
+                <Pressable
+                  key={id}
+                  disabled={busy}
+                  onPress={() =>
+                    void run(async () =>
+                      changeMethod(id as keyof typeof METHODS),
+                    )
+                  }
+                  style={[s.chip, method === id && s.chipOn]}
+                >
+                  <Text style={[s.chipText, method === id && s.white]}>
+                    {label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={s.label}>حساب وقت العصر</Text>
+            <View style={s.wrap}>
+              {(["shafii", "hanafi"] as const).map((id) => (
+                <Pressable
+                  key={id}
+                  disabled={busy}
+                  onPress={() => void run(async () => changeMadhab(id))}
+                  style={[s.chip, madhab === id && s.chipOn]}
+                >
+                  <Text style={[s.chipText, madhab === id && s.white]}>
+                    {id === "hanafi" ? "حنفي" : "الجمهور"}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={s.note}>
+              المواقيت محسوبة فلكيًا. طابق الطريقة مع الجهة المحلية، واضبط
+              المنطقة الزمنية للهاتف تلقائيًا. يمكنك معايرة فرق دقائق المسجد لكل
+              صلاة.
+            </Text>
+            {PRAYER_IDS.map((p) => {
+              const n = config.adjustments?.[p] || 0;
+              return (
+                <View key={p} style={s.row}>
+                  <Text style={s.label}>
+                    {PRAYER_AR[p]} · {formatPrayerClock(todayTimes[p])}
+                  </Text>
+                  <View style={s.wrap}>
+                    <Pressable
+                      accessibilityLabel={`تقليل وقت ${PRAYER_AR[p]} دقيقة`}
+                      disabled={busy || n <= -30}
+                      style={s.adjust}
+                      onPress={() =>
+                        void update({
+                          adjustments: { ...config.adjustments, [p]: n - 1 },
+                        })
+                      }
+                    >
+                      <Text>−</Text>
+                    </Pressable>
+                    <Text style={s.note}>
+                      {n > 0 ? "+" : ""}
+                      {n} د
+                    </Text>
+                    <Pressable
+                      accessibilityLabel={`زيادة وقت ${PRAYER_AR[p]} دقيقة`}
+                      disabled={busy || n >= 30}
+                      style={s.adjust}
+                      onPress={() =>
+                        void update({
+                          adjustments: { ...config.adjustments, [p]: n + 1 },
+                        })
+                      }
+                    >
+                      <Text>+</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+        <View style={[s.card, s.row]}>
+          <Text style={s.label}>تفعيل تذكيرات الصلاة</Text>
+          <Switch
+            disabled={busy}
+            value={config.notificationsEnabled}
+            onValueChange={(on) =>
+              on
+                ? void permission()
+                : void update({ notificationsEnabled: false })
+            }
+          />
+        </View>
+        <Text style={s.label}>وتيرة خطة الصلاة</Text>
+        <View style={s.wrap}>
+          {(
+            [
+              ["gentle", "الأذان فقط"],
+              ["steady", "الأذان والمتابعة"],
+              ["strong", "قبل الأذان وبعده"],
+            ] as [PrayerPreset, string][]
+          ).map(([id, label]) => (
+            <Pressable
+              key={id}
+              disabled={busy}
+              onPress={() => void update(prayerPresetPatch(id))}
+              style={[s.chip, config.reminderIntensity === id && s.chipOn]}
+            >
+              <Text
+                style={[s.chipText, config.reminderIntensity === id && s.white]}
+              >
+                {label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        {PRAYER_IDS.map((p) => {
+          const cfg = config[p],
+            before = config.preAlertByPrayer?.[p] ?? config.preAlertMin ?? 0,
+            after = config.checkinFollowUpEnabled
+              ? (config.followUpMin?.[p] ?? DEFAULT_FOLLOW_UP[p])
+              : 0,
+            open = expanded === p;
+          return (
+            <View key={p} style={s.card}>
+              <View style={s.row}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: open }}
+                  onPress={() => setExpanded(open ? null : p)}
+                  style={{ flex: 1, gap: 4 }}
+                >
+                  <Text style={s.prayer}>
+                    {PRAYER_AR[p]}{" "}
+                    <Text style={s.time}>
+                      {formatPrayerClock(todayTimes[p])}
+                    </Text>{" "}
+                    {open ? "−" : "+"}
+                  </Text>
+                  <Text style={s.note}>
+                    {cfg.enabled
+                      ? `${before ? `قبل ${ar(before)} د · ` : ""}${cfg.athanEnabled === false ? "دون أذان" : "في الوقت"}${after ? ` · متابعة بعد ${ar(after)} د` : ""}`
+                      : "التذكير متوقف"}
+                  </Text>
+                </Pressable>
+                <Switch
+                  disabled={busy}
+                  value={cfg.enabled}
+                  onValueChange={(enabled) =>
+                    void update({ [p]: { ...cfg, enabled } })
+                  }
+                />
+              </View>
+              {open && cfg.enabled && (
+                <>
+                  <Text style={s.label}>قبل الأذان</Text>
+                  {chips(
+                    [0, 5, 10, 15, 20, 30, 60],
+                    before,
+                    (n) =>
+                      void update({
+                        preAlertByPrayer: {
+                          ...config.preAlertByPrayer,
+                          [p]: n,
+                        },
+                      }),
+                  )}
+                  <View style={s.row}>
+                    <Text style={s.label}>عند دخول الوقت</Text>
+                    <Switch
+                      disabled={busy}
+                      value={cfg.athanEnabled !== false}
+                      onValueChange={(athanEnabled) =>
+                        void update({ [p]: { ...cfg, athanEnabled } })
+                      }
+                    />
+                  </View>
+                  {cfg.athanEnabled !== false && (
+                    <View style={s.row}>
+                      <Text style={s.label}>صوت الأذان</Text>
+                      <Switch
+                        disabled={busy}
+                        value={cfg.sound}
+                        onValueChange={(sound) =>
+                          void update({ [p]: { ...cfg, sound } })
+                        }
+                      />
+                    </View>
+                  )}
+                  <Text style={s.label}>«هل صليت؟» بعد الأذان</Text>
+                  {chips(
+                    [0, 15, 20, 30, 35, 45, 60, 90],
+                    after,
+                    (n) =>
+                      void update({
+                        ...followUpPatch(config, p, n),
+                      }),
+                  )}
+                </>
+              )}
+            </View>
+          );
+        })}
+        <Text style={s.note}>
+          يُجدَّد الجدول عند فتح التطبيق وتغيير الموقع أو الخطة. على iPhone عدد
+          التنبيهات محدود، فافتح سراج يوميًا. إعدادات البطارية والصامت قد تؤثر
+          على التنبيه والصوت؛ لا يمكن ضمان توقيت مطلق على كل الأجهزة.
+        </Text>
+      </ScrollView>
+      <View style={[s.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        {!!message && (
+          <Text
+            accessibilityRole="alert"
+            style={[s.feedback, failed && { color: C.bad }]}
+          >
+            {message}
+          </Text>
+        )}
+        {failed && (
+          <Pressable onPress={() => void Linking.openSettings()}>
+            <Text style={s.link}>فتح إعدادات الهاتف</Text>
+          </Pressable>
+        )}
+        <Pressable
+          accessibilityRole="button"
+          disabled={busy}
+          onPress={permission}
+          style={[s.button, busy && { opacity: 0.6 }]}
+        >
+          {busy ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={s.buttonText}>
+              {config.notificationsEnabled
+                ? "حفظ وتحديث التذكيرات"
+                : "تفعيل التنبيهات وتحديث الجدول"}
+            </Text>
+          )}
+        </Pressable>
+      </View>
+    </View>
+  );
 }
-const s = StyleSheet.create({ root: { flex: 1, backgroundColor: C.paper }, head: { padding: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, back: { color: C.gold, fontFamily: F.s }, title: { fontFamily: F.b, color: C.ink, fontSize: 24 }, hero: { backgroundColor: C.green, padding: 22, borderRadius: 22, gap: 10 }, heroTitle: { fontFamily: F.b, color: '#FFF5DB', fontSize: 23, textAlign: 'right' }, heroCopy: { fontFamily: F.r, color: '#DAE6D8', lineHeight: 24, textAlign: 'right', fontSize: 13 }, card: { backgroundColor: C.card, padding: 18, borderRadius: 22, gap: 14, borderWidth: 1, borderColor: C.line }, row: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between', gap: 10 }, prayer: { fontFamily: F.b, color: C.ink, fontSize: 22 }, label: { fontFamily: F.s, color: C.ink, textAlign: 'right', fontSize: 14, flexShrink: 1 }, small: { fontFamily: F.r, color: C.ink2 }, chips: { flexDirection: 'row-reverse', flexWrap: 'wrap', gap: 8 }, chip: { borderRadius: 12, backgroundColor: C.chip, padding: 11, minWidth: 49, alignItems: 'center' }, chipOn: { backgroundColor: C.green }, chipText: { fontFamily: F.m, color: C.ink, fontSize: 12 }, button: { backgroundColor: C.green, borderRadius: 16, padding: 17, alignItems: 'center' }, buttonText: { fontFamily: F.b, color: '#fff', textAlign: 'center' }, note: { fontFamily: F.r, color: C.muted, lineHeight: 23, fontSize: 12, textAlign: 'right' } });
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.paper },
+  head: {
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  touch: { minHeight: 48, justifyContent: "center", paddingHorizontal: 8 },
+  title: { fontFamily: F.b, color: C.ink, fontSize: 23 },
+  link: { fontFamily: F.s, color: C.gold, textAlign: "right" },
+  hero: { padding: 18, backgroundColor: C.green, borderRadius: 22, gap: 7 },
+  heroTitle: {
+    fontFamily: F.b,
+    color: "#fff",
+    fontSize: 23,
+    textAlign: "right",
+  },
+  heroCopy: {
+    fontFamily: F.r,
+    color: "#e2ecde",
+    fontSize: 12,
+    lineHeight: 22,
+    textAlign: "right",
+  },
+  card: {
+    padding: 14,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.card,
+    gap: 10,
+  },
+  row: {
+    flexDirection: "row-reverse",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
+  label: {
+    fontFamily: F.s,
+    color: C.ink,
+    fontSize: 13,
+    textAlign: "right",
+    flexShrink: 1,
+  },
+  prayer: { fontFamily: F.b, color: C.ink, fontSize: 18, textAlign: "right" },
+  time: { fontFamily: F.m, color: C.gold, fontSize: 13 },
+  note: {
+    fontFamily: F.r,
+    color: C.muted,
+    fontSize: 11,
+    lineHeight: 22,
+    textAlign: "right",
+  },
+  chips: { gap: 7, paddingVertical: 2 },
+  wrap: {
+    flexDirection: "row-reverse",
+    flexWrap: "wrap",
+    gap: 7,
+    alignItems: "center",
+  },
+  chip: {
+    minHeight: 44,
+    paddingHorizontal: 12,
+    justifyContent: "center",
+    borderRadius: 12,
+    backgroundColor: C.chip,
+  },
+  chipOn: { backgroundColor: C.green },
+  chipText: { fontFamily: F.m, color: C.ink, fontSize: 12 },
+  white: { color: "#fff" },
+  adjust: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: C.chip,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  secondary: {
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  footer: {
+    padding: 14,
+    gap: 7,
+    borderTopWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.paper,
+  },
+  feedback: {
+    fontFamily: F.m,
+    color: C.green,
+    fontSize: 12,
+    textAlign: "right",
+    lineHeight: 21,
+  },
+  button: {
+    minHeight: 52,
+    padding: 12,
+    borderRadius: 16,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  buttonText: { fontFamily: F.b, color: "#fff", fontSize: 15 },
+});

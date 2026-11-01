@@ -16,3 +16,11 @@ test('Changing sound replaces the matching request and checking in removes only 
 test('Lost OS requests are restored even if the previous saved plan matches',()=>{
  assert.deepEqual(reconcileSchedule([request],[request],[]),{cancel:[],schedule:[request]});
 });
+
+test('Granting exact-alarm access upgrades the same adhan request instead of retaining approximate delivery', () => {
+ const previous: any = { id: 'athan:2026-11-01:fajr', at: new Date('2026-11-01T05:00:00'), title: 'الفجر', body: '', channel: 'athan', sound: 'athan', data: { type: 'prayer_athan', deliveryMode: 'bestEffort' } };
+ const next: any = { ...previous, data: { ...previous.data, deliveryMode: 'alarmClock' } };
+ const changes = reconcileSchedule([previous], [next], [previous.id]);
+ assert.deepEqual(changes.cancel, [previous.id]);
+ assert.deepEqual(changes.schedule, [next]);
+});

@@ -1,3 +1,5 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { TOUR_KEY } from "../onboarding/AppTourScreen";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
@@ -58,6 +60,7 @@ const SCENES = {
 function habitDestination(
   p: HabitPlan,
 ): { screen: string; params?: object } | null {
+  if (p.id === "sunnah") return { screen: "Sunnah" };
   if (p.kind === "prayers" || p.id === "prayer" || p.id === "fajr")
     return { screen: "PrayerTracker" };
   if (p.kind === "quran_read" || p.id === "quran" || p.id === "quran_listen")
@@ -82,7 +85,7 @@ export default function SiragHome({ navigation }: any) {
   const s = useMemo(() => styles(palette), [palette]);
   const night = theme === "dark";
   const prayer = useHomePrayerTimes();
-  const { checkins } = usePrayer();
+  const { checkins, isRestDayToday } = usePrayer();
   const [now, setNow] = useState(Date.now());
   const day = localDay(new Date(now));
   const [sources, setSources] = useState<ReportSources | null>(null);
@@ -130,10 +133,17 @@ export default function SiragHome({ navigation }: any) {
     const timer = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(timer);
   }, []);
+  useFocusEffect(useCallback(() => {
+    let active = true;
+    void Promise.all([AsyncStorage.getItem(TOUR_KEY), loadProfile()]).then(async ([seen, profile]) => {
+      if (active && !seen && profile) { await AsyncStorage.setItem(TOUR_KEY, 'offered'); if (active) navigation.navigate('AppTour'); }
+    }).catch(() => {});
+    return () => { active = false; };
+  }, [navigation]));
   const plans = sources?.plans || [];
   const daily = plans.filter(
     (p) =>
-      p.frequency === "daily" || new Date(day + "T12:00:00").getDay() === 5,
+      (!isRestDayToday || p.category !== "الصلاة") && (p.frequency === "daily" || new Date(day + "T12:00:00").getDay() === 5),
   );
   const logs = sources?.logs[day] || {};
   const done = daily.filter(
@@ -726,6 +736,7 @@ export default function SiragHome({ navigation }: any) {
             {modal === "appearance" && (
               <>
                 <Text style={s.sheetLabel}>المظهر</Text>
+                <Pressable accessibilityRole="button" style={s.sheetButton} onPress={() => { setModal(null); open('AppTour'); }}><Text style={s.habitName}>دليل سراج · جولة تفاعلية</Text><SirajIcon name="arrow" color={palette.accent} /></Pressable>
                 <View style={s.themeOptions}>
                   {(
                     [

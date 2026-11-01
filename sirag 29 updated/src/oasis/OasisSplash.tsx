@@ -88,8 +88,8 @@ export default function OasisSplash({ navigation }: any) {
     setLeaving(true);
     let waiting = 0;
     try { waiting = (await oasisWaiting()).newRewards; } catch { /* Home remains available offline. */ }
-    const nextRoute = !returning ? 'HabitSetup' : waiting > 0 ? 'Oasis' : 'Home';
-    const nextParams = !returning ? { first: true } : undefined;
+    const nextRoute = !returning ? 'AppTour' : waiting > 0 ? 'Oasis' : 'Home';
+    const nextParams = !returning ? { nextRoute: 'HabitSetup', nextParams: { first: true } } : undefined;
     try {
       const profile = await loadProfile();
       if (!launch.fromNotification) {

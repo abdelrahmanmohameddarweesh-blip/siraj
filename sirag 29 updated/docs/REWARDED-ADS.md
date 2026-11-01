@@ -10,7 +10,7 @@ Rewarded advertising is limited to the oasis. It does not require Firebase Funct
 | `water` | Growing plant or watering can when out of water | Two water drops |
 | `gift` | Gift button in the oasis header | One seed and one water drop |
 
-Every offer is explicitly optional and includes “المتابعة دون إعلان”. Ordinary habit-based seeds/water and all worship features remain available without watching an ad. No interstitial, automatic launch ad, banner or ad is inserted in Quran reading/listening, Salah, Athkar, Hifz, reports or onboarding. The garden is the first release's monetization area. A future purely decorative plant catalog could offer more optional cosmetic unlocks; it is not implemented here.
+Every offer is explicitly optional and includes “المتابعة دون إعلان”. Ordinary habit-based seeds/water and all worship features remain available without watching an ad. There are no interstitials or automatic launch ads. Two labelled banner slots appear between Athkar cards (after cards 4 and 10), with space separating ads from reading/counter controls. Banners give no worship or garden credit. Quran reading/listening, Salah, Hifz, reports and onboarding contain no ads. A future purely decorative plant catalog could offer more optional cosmetic unlocks; it is not implemented here.
 
 A rewarded advertisement can be video or an interactive format supplied by AdMob. The app labels it an advertisement, promises the exact garden resource, and waits for the SDK's `EARNED_REWARD` event. Loading, a timer, a WebView message or closing early never grants a reward. Duplicate SDK events cannot duplicate a grant. The reward changes seeds/water only—not worship completion, habit streaks, prayer points, lanterns or participation days.
 
@@ -23,7 +23,7 @@ The owner's screenshot confirms these **Android** values, now included in `ads.c
 - App ID: `ca-app-pub-6157287197742359~2477114700`
 - Rewarded Ad Unit ID: `ca-app-pub-6157287197742359/9388018310`
 
-They are used for the Android native app registration and live-release configuration. Development still uses Google's test rewarded unit; release ads remain off unless explicitly enabled. Platform environment variables can override this file.
+They are used for the Android native app registration and live-release configuration. Preview and play-internal builds use Google test ads; the production profile uses the owner's Android rewarded ID in live mode. Live banner requests additionally require the separate banner ID, now configured. Platform environment variables can override this file.
 
 No iOS IDs have been confirmed, so iOS live requests stay disabled. The earlier ID `ca-app-pub-6157287197742359~8744745472` was not assigned to a platform because its platform/ownership was not confirmed. Android IDs must not be reused for iOS.
 
@@ -45,7 +45,7 @@ A not-yet-published app may have limited live serving. Follow current AdMob app-
 The package uses `react-native-google-mobile-ads` 17.4.0, which declares React Native >=0.86 support; Siraj uses RN 0.88/Expo 58. Native app IDs are inserted through the Expo config plugin. Unset app IDs use Google's official sample IDs to keep native test builds valid.
 
 - Development native builds always use `TestIds.REWARDED`, even if someone sets live IDs.
-- Release builds default to ads **off**.
+- The production profile sets live mode; play-internal and preview profiles set test mode. A build with no explicit mode remains off.
 - A release-style preview must explicitly set `EXPO_PUBLIC_ADS_MODE=test` to show Google test ads.
 - `live` requires both an own-platform App ID and Rewarded Ad Unit ID, and rejects Google's sample publisher IDs.
 - Expo Go and web never load the native ad SDK or grant a simulated video reward. Expo Go development can show the offer design with a disabled Watch button and a clear explanation. Normal gardening still works.
@@ -63,11 +63,17 @@ EXPO_PUBLIC_ADMOB_ANDROID_REWARDED_ID=
 
 Actual rewarded ads require a **new native build**, not `npx expo start` inside Expo Go. A local Android build can use `npx expo run:android` with Android Studio/SDK installed. Local iOS builds use Xcode with `npx expo run:ios` and the required signing setup. No build, paid EAS plan or store publishing purchase has been started from this workspace. Platform developer-account/store fees are separate from Firebase Spark and are not required for the existing Expo Go feature preview.
 
-To enable live ads later, supply the correct platform IDs and use `EXPO_PUBLIC_ADS_MODE=live` in a release build. Do not test by viewing/clicking your own live ads. Native App IDs are build-time settings; changing them needs rebuilding the binary.
+The production EAS profile now uses `EXPO_PUBLIC_ADS_MODE=live` with the supplied Android IDs. Verify native ads with the internal test profile before public submission. Do not test by viewing/clicking your own live ads. Native App IDs are build-time settings; changing them needs rebuilding the binary.
+
+## Two Athkar banners
+
+Create AdMob → Apps → Siraj (Android) → Ad units → Add ad unit → Banner. Name it `Siraj Athkar Banner`. The owner supplied the public Banner Ad Unit ID `ca-app-pub-6157287197742359/1804274820`; a rewarded unit cannot serve banners. Store the new ID in `ads.config.json` → `android.bannerUnitId`, or override with `EXPO_PUBLIC_ADMOB_ANDROID_BANNER_ID`. If a live banner ID is removed or invalid, production omits the slots rather than substituting a fake ad or Google's sample unit. Native internal builds use Google's test banner ID.
+
+There are two placements per Athkar list, not a promise of exactly two lifetime impressions: SDK refresh/viewability and ad availability determine impressions. No-fill/errors hide the slot; content and counting remain usable. Configure ads disclosure in Play Console to match the actual submitted build and review publisher account readiness, consent messaging, app-ads.txt and app verification before public monetization. Test ads earn no revenue. Ad serving and earnings cannot be guaranteed by adding an SDK.
 
 ## Consent and content
 
-The native provider refreshes Google's UMP consent flow after the user asks to watch and before initializing/requesting an ad. If UMP cannot request ads, the offer fails closed and grants nothing. Its privacy-options action is available from the offer sheet where applicable. Configure the relevant Privacy & messaging forms in AdMob; missing account/message setup can prevent even a native test request.
+The native provider updates Google's UMP status before requesting an ad (on a rewarded request or banner mount), with concurrent preparation shared between the two banner placements. All requests use conservative teen treatment, under-age-of-consent treatment, non-personalized ads and G content. This intentionally protects younger teens across regions; it may reduce fill. These flags are not proof of age verification or a replacement for any applicable consent obligations. If UMP cannot request ads, the offer fails closed and grants nothing. Its privacy-options action is available from the offer sheet where applicable. Configure the relevant Privacy & messaging forms in AdMob; missing account/message setup can prevent even a native test request.
 
 Requests use non-personalized ads, disabled publisher personalization and maximum content rating G. The app sends no name, gender, prayer records, habit history, Firebase UID or precise location as ad targeting. Google SDK device processing is still governed by its consent/privacy mechanisms; non-personalized is not a claim of zero data processing. The owner must classify the app's intended audience accurately in AdMob; this change does not assert a child-directed or adult-only audience.
 

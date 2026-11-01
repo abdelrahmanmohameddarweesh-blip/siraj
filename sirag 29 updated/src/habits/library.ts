@@ -45,9 +45,9 @@ export const LIBRARY: HabitDef[] = [
   { id: 'sunnah', title: 'السنن الرواتب', category: 'الصلاة', icon: '🌙', unit: 'ركعة', kind: 'count',
     blurb: 'ابدأ بسنة الفجر ثم أضف بقية الرواتب تدريجيًا.',
     presets: [
-      { id: 'gentle', name: 'بداية لطيفة', target: 2, frequency: 'daily', ramp: { start: 2, step: 2, everyDays: 7, max: 6 }, reminders: [R('fajr', -10)], summary: 'ركعتان قبل الفجر، وتزيد ركعتين كل أسبوع حتى ست.' },
-      { id: 'steady', name: 'ثبات', target: 6, frequency: 'daily', reminders: [R('fajr', -10), R('dhuhr', 10)], followUpMin: 60, summary: 'سنة الفجر والظهر يوميًا.' },
-      { id: 'strong', name: 'همّة', target: 12, frequency: 'daily', reminders: [R('fajr', -10), R('dhuhr', 10), R('maghrib', 10)], followUpMin: 60, summary: 'الرواتب كاملة ثنتا عشرة ركعة.' },
+      { id: 'gentle', name: 'بداية لطيفة', target: 2, frequency: 'daily', ramp: { start: 2, step: 2, everyDays: 7, max: 6 }, reminders: [R('fajr', 5)], summary: 'ركعتان قبل الفجر، وتزيد ركعتين كل أسبوع حتى ست.' },
+      { id: 'steady', name: 'ثبات', target: 6, frequency: 'daily', reminders: [R('fajr', 5), R('dhuhr', 10)], followUpMin: 60, summary: 'سنة الفجر والظهر يوميًا.' },
+      { id: 'strong', name: 'همّة', target: 12, frequency: 'daily', reminders: [R('fajr', 5), R('dhuhr', 10), R('maghrib', 10)], followUpMin: 60, summary: 'الرواتب كاملة ثنتا عشرة ركعة.' },
     ] },
   { id: 'witr', title: 'صلاة الوتر', category: 'الصلاة', icon: '✨', unit: 'ركعة', kind: 'count',
     blurb: 'ختام الليل بركعة أو ثلاث قبل النوم.',

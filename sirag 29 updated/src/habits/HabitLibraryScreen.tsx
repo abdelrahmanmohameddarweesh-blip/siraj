@@ -1,3 +1,4 @@
+import { prayerPresetPatch, PrayerPreset } from '../notifications/prayerPresets';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -53,7 +54,7 @@ export default function HabitLibraryScreen({ navigation, route }: any) {
     setSaving(true);
     try {
       if (def.kind === 'prayers') {
-        await updateNotifications({ notificationsEnabled: true, checkinFollowUpEnabled: chosen.id !== 'gentle', preAlertMin: chosen.id === 'strong' ? 10 : 0, preAlertByPrayer: {}, followUpMin: {} });
+        await updateNotifications(prayerPresetPatch(chosen.id as PrayerPreset));
       }
       const preset: PlanPreset = custom ? {
         ...chosen, target, frequency, ramp: gradual && chosen.ramp ? { ...chosen.ramp, max: target } : undefined,

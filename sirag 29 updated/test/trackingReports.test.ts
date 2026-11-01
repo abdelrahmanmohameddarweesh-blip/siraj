@@ -1,3 +1,4 @@
+import { ATHKAR } from '../src/athkar/athkarData';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { playbackCredit, splitPlayback, prayerCount } from '../src/tracking/activityModel';
@@ -34,7 +35,7 @@ test('Reports use canonical data, unique pages and real listening even without h
  const input=empty();
  input.checkins[`fajr_${date}`]={prayer:'fajr',dateStr:date,status:'on_time',mode:'jamaa',checkedInAt:time(5).toISOString(),pointsAwarded:10,xpAwarded:15};
  input.readDays[date]=[1,1,2];input.listening[date]=121;
- input.athkar[date]={morning:{counts:{},done:true,seconds:100}};
+ input.athkar[date]={morning:{counts:Object.fromEntries(ATHKAR.map(d => [d.id,d.repeat])),done:true,seconds:100}};
  const h=newState({start:{s:114,a:1},order:'juzAmma',perDay:1});h.items['114:1']={box:0,due:date,lapses:0,learnedOn:date};h.reviewed={[date]:2};input.hifz=h;
  const totals=reportTotals(buildReport(input,[date],time(13),prayers));
  assert.equal(totals.prayers,1);assert.equal(totals.due,2);assert.equal(totals.pages,2);assert.equal(totals.listenSeconds,121);assert.equal(totals.morning,1);assert.equal(totals.learned,1);assert.equal(totals.reviewed,2);assert.equal(totals.habitsTotal,0);

@@ -1,3 +1,4 @@
+import { DeviceEventEmitter } from "react-native";
 import { doc, getFirestore, serverTimestamp, setDoc } from "firebase/firestore";
 import app from "../firebase/init";
 import { ensureAuthenticatedUser } from "./cloudIdentity";
@@ -23,6 +24,7 @@ export async function saveProfile(name: string, gender: Gender) {
       ...(previous?.cloudUid ? { cloudUid: previous.cloudUid } : {}),
     }),
   );
+  DeviceEventEmitter.emit("siraj-profile-updated");
   return profile!;
 }
 let syncing: Promise<boolean> | null = null;

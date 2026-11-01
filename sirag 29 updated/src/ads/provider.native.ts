@@ -45,8 +45,7 @@ export function adSupport(): AdSupport {
     return {
       available: false,
       test,
-      message:
-        "الإعلانات الحية موقوفة حتى اكتمال إعدادات إصدار العائلة وخصوصية الأطفال.",
+      message: "الإعلانات الحية موقوفة في إعدادات هذه النسخة.",
     };
   if (
     !test &&
@@ -83,7 +82,7 @@ async function initialize() {
   // Refresh the required regional consent flow on each user-initiated request.
   await s.default().setRequestConfiguration({
     maxAdContentRating: s.MaxAdContentRating.G,
-    ageRestrictedTreatment: s.AgeRestrictedTreatment.CHILD,
+    ageRestrictedTreatment: s.AgeRestrictedTreatment.TEEN,
     tagForUnderAgeOfConsent: true,
     publisherPrivacyPersonalizationState: "disabled",
   });
@@ -95,16 +94,40 @@ async function initialize() {
     );
   if (!initializing)
     initializing = (async () => {
-      await s.default().setRequestConfiguration({
-        maxAdContentRating: s.MaxAdContentRating.G,
-        publisherPrivacyPersonalizationState: "disabled",
-      });
       await s.default().initialize();
     })().catch((e) => {
       initializing = null;
       throw e;
     });
   await initializing;
+}
+let preparing: Promise<void> | null = null;
+export async function prepareAds() {
+  if (preparing) return preparing;
+  preparing = initialize().finally(() => {
+    preparing = null;
+  });
+  return preparing;
+}
+export function bannerSupport(): AdSupport & { unitId?: string } {
+  const support = adSupport();
+  if (!support.available) return support;
+  const unitId =
+    Platform.OS === "ios"
+      ? process.env.EXPO_PUBLIC_ADMOB_IOS_BANNER_ID || adConfig.ios.bannerUnitId
+      : process.env.EXPO_PUBLIC_ADMOB_ANDROID_BANNER_ID ||
+        adConfig.android.bannerUnitId;
+  if (support.test) return { ...support, unitId: getSdk().TestIds.BANNER };
+  if (
+    !/^ca-app-pub-\d+\/\d+$/.test(unitId || "") ||
+    unitId?.includes("3940256099942544")
+  )
+    return {
+      ...support,
+      available: false,
+      message: "لم يضف الناشر معرّف البانر بعد.",
+    };
+  return { ...support, unitId };
 }
 export async function showRewardedAd(
   onEarned: () => Promise<unknown>,
@@ -114,7 +137,7 @@ export async function showRewardedAd(
   if (busy) throw new Error("إعلان آخر قيد التشغيل");
   busy = true;
   try {
-    await initialize();
+    await prepareAds();
     const s = getSdk();
     const ad = s.RewardedAd.createForAdRequest(
       support.test ? s.TestIds.REWARDED : liveUnit!,

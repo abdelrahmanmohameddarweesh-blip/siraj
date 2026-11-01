@@ -63,6 +63,7 @@ export function todaysHabits(src: HabitSources): OasisHabit[] {
   }
   for (const plan of src.plans) {
     if (!plan || plan.frequency !== 'daily' || PRAYER_DUPLICATES.has(plan.id) || plan.kind === 'prayers') continue;
+    if (src.restDay && plan.category === 'الصلاة') continue;
     const value = src.logs[src.day]?.[plan.id] || 0;
     const target = effectiveTarget(plan, src.day);
     out.push({

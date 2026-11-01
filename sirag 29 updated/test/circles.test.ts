@@ -1,3 +1,4 @@
+import { ATHKAR } from "../src/athkar/athkarData";
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
@@ -74,7 +75,7 @@ test("habit progress uses canonical prayer, Athkar and Hifz records without open
       ["dhuhr_" + day]: { status: "rest" },
       ["asr_" + day]: { status: "qada" },
     },
-    athkar: { [day]: { morning: { done: true }, evening: { done: false } } },
+    athkar: { [day]: { morning: { done: true, counts: Object.fromEntries(ATHKAR.map(d => [d.id, d.repeat])) }, evening: { done: false } } },
     hifz: {
       items: { a: { learnedOn: day }, b: { learnedOn: "2026-10-26" } },
       reviewed: { [day]: 3 },

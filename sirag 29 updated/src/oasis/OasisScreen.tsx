@@ -201,6 +201,7 @@ export default function OasisScreen({ navigation }: any) {
       navigation.navigate("QuranReader");
       return;
     }
+    if (h.planId === 'sunnah') { navigation.navigate('Sunnah'); return; }
     const mark = async () => {
       const day = localDay();
       const logs = await readJSON<Record<string, Record<string, number>>>(

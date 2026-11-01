@@ -45,10 +45,14 @@ export function calculatePrayerTimes(
   coords: { latitude: number; longitude: number },
   date: Date,
   method: CalculationMethodName = 'Egyptian',
-  madhab: MadhabName = 'shafii'
+  madhab: MadhabName = 'shafii',
+  adjustments: Partial<Record<PrayerKey, number>> = {}
 ): PrayerTimesDay {
   const coordinates = new Coordinates(coords.latitude, coords.longitude);
   const params = getCalculationParameters(method, madhab);
+  for (const [key, value] of Object.entries(adjustments)) {
+    if (key in params.adjustments && Number.isInteger(value) && Math.abs(value!) <= 30) params.adjustments[key as PrayerKey] = value!;
+  }
   const prayerTimes = new PrayerTimes(coordinates, date, params);
 
   // Calculate next day's Fajr to close the Isha window
@@ -78,13 +82,14 @@ export function calculateRollingWeek(
   startDate: Date = new Date(),
   days = 7,
   method: CalculationMethodName = 'Egyptian',
-  madhab: MadhabName = 'shafii'
+  madhab: MadhabName = 'shafii',
+  adjustments: Partial<Record<PrayerKey, number>> = {}
 ): PrayerTimesDay[] {
   const result: PrayerTimesDay[] = [];
   for (let i = 0; i < days; i++) {
     const d = new Date(startDate);
     d.setDate(startDate.getDate() + i);
-    result.push(calculatePrayerTimes(coords, d, method, madhab));
+    result.push(calculatePrayerTimes(coords, d, method, madhab, adjustments));
   }
   return result;
 }

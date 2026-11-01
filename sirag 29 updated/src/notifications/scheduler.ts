@@ -10,7 +10,7 @@ import { reconcileSchedule } from './reconcileSchedule';
 import type { PrayerNotificationConfig } from '../prayer/types';
 
 const CONFIG_KEY = 'batl-prayer-notification-config-v1';
-const SIG_KEY = 'sirag-notif-signature-v1';
+const SIG_KEY = 'sirag-notif-signature-v2';
 const OWN = ['pre:', 'athan:', 'pfu:', 'hab:', 'habfu:'];
 export const CHANNELS = { athan: 'athan_v2', checkin: 'prayer_checkin', habits: 'habits', silent: 'prayer_silent' } as const;
 
@@ -54,19 +54,19 @@ export async function requestPermissionAndSync(): Promise<boolean> {
 }
 
 export async function planNow(now = new Date()): Promise<Planned[]> {
-  const [loc, method, madhab, settings, plans, logs, checkins, restDays] = await Promise.all([
-    getSavedLocation(), getSavedCalculationMethod(), getSavedMadhab(), loadPrayerSettings(),
+  const [loc, method, madhab, config, plans, logs, checkins, restDays, profile] = await Promise.all([
+    getSavedLocation(), getSavedCalculationMethod(), getSavedMadhab(), read<PrayerNotificationConfig | null>(CONFIG_KEY, null),
     read<HabitPlan[]>(PLANS_KEY, []), read<Record<string, Record<string, number>>>(LOG_KEY, {}),
-    read<Record<string, { status?: string }>>('batl-prayer-checkin-records-v1', {}), read<string[]>('batl-prayer-rest-days-v1', []),
+    read<Record<string, { status?: string }>>('batl-prayer-checkin-records-v1', {}), read<string[]>('batl-prayer-rest-days-v1', []), read<{ gender?: string } | null>('sirag-personal-profile-v1', null),
   ]);
-  const days = calculateRollingWeek(loc, now, 3, method, madhab);
-  return buildSchedule({ now, days, prayer: settings, plans, logs, checkins, restDays });
+  const days = calculateRollingWeek(loc, now, 7, method, madhab, config?.adjustments);
+  return buildSchedule({ now, days, prayer: settingsFromConfig(config), limit: Platform.OS === 'ios' ? 60 : 400, plans, logs, checkins, restDays: profile?.gender === 'female' ? restDays : [] });
 }
 
 let running: Promise<void> | null = null;
 let resync = false;
-export async function syncNotifications(force = false): Promise<void> {
-  if (running) { resync = true; return running; }
+export async function syncNotifications(force = false, strict = false): Promise<void> {
+  if (running) { if (!strict) { resync = true; return running; } await running; if (running) await running; return syncNotifications(force, strict); }
   running = (async () => {
     try {
       if (!(await hasPermission())) return;
@@ -74,8 +74,11 @@ export async function syncNotifications(force = false): Promise<void> {
       const existing = await Notifications.getAllScheduledNotificationsAsync();
       const owned = existing.filter(n => OWN.some(p => n.identifier.startsWith(p)));
       // Reserve capacity for other app features before reconciling our requests.
-      const capacity = Math.max(0, 60 - (existing.length - owned.length));
-      const planned = (await planNow()).slice(0, capacity);
+      const capacity = Math.max(0, (Platform.OS === 'ios' ? 60 : 400) - (existing.length - owned.length));
+      const exact = Platform.OS !== 'android' || (await Notifications.getExactAlarmPermissionsAsync()).granted;
+      // Include delivery mode in the signature so granting exact-alarm access
+      // upgrades already scheduled best-effort adhans instead of retaining them.
+      const planned = (await planNow()).slice(0, capacity).map(n => n.data.type === 'prayer_athan' ? { ...n, data: { ...n.data, deliveryMode: exact ? 'alarmClock' : 'bestEffort' } } : n);
       const sig = JSON.stringify(planned);
       const stored = await AsyncStorage.getItem(SIG_KEY);
       if (!force && sig === stored && owned.length === planned.length && planned.every(n => owned.some(e => e.identifier === n.id))) return;
@@ -88,11 +91,11 @@ export async function syncNotifications(force = false): Promise<void> {
         await Notifications.scheduleNotificationAsync({
           identifier: n.id,
           content: { title: n.title, body: n.body, data: n.data, ...(n.data.type === 'prayer_checkin' ? { categoryIdentifier: 'PRAYER_CHECKIN_CATEGORY' } : {}), sound: n.sound === 'athan' ? 'athan.wav' : n.sound ? true : false },
-          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: n.at, channelId: CHANNELS[n.channel] },
+          trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: n.at, channelId: CHANNELS[n.channel], delivery: n.data.deliveryMode === 'alarmClock' ? 'alarmClock' : 'bestEffort' },
         });
       }
       await AsyncStorage.setItem(SIG_KEY, sig);
-    } catch (e) { console.warn('[notifications] sync failed', e); }
+    } catch (e) { console.warn('[notifications] sync failed', e); if (strict) throw e; }
     finally { running = null; if (resync) { resync = false; void syncNotifications(true); } }
   })();
   return running;

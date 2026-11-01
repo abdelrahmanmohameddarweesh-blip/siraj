@@ -9,8 +9,8 @@ Prepared in source:
 - Installed app label `سراج`, store listing title `Siraj | سراج`, version `1.0.0`, initial Android versionCode `1`.
 - Android package `com.sirag.livingdesert`. Confirm this before the first upload; a published app's package is permanent. If it already exists in your Play Console, keep its existing signing/upload-key setup and increment its version code.
 - Original generated lantern icon and a 512×512 Play icon export; 1024×500 feature graphic.
-- `play-internal` / `production` EAS profiles produce an Android App Bundle (.aab). They use remote build-number increments. Both currently keep ads off.
-- A separate APK `preview` profile remains available for adult developer testing, with Google test rewarded ads. No live ad serving is approved.
+- `play-internal` / `production` EAS profiles produce an Android App Bundle (.aab). They use remote build-number increments. Internal builds use test ads; production uses live Android rewarded ads and live banners when the separate banner ID has been supplied.
+- A separate APK `preview` profile remains available for adult developer testing, with Google test rewarded ads. Live Android monetization has been requested by the owner; account readiness and native ad behavior still need verification before public release.
 - In-app account/data deletion with an interrupted-deletion checkpoint, cloud-sync blocking and device/context reset; private/profile/report rules adjusted for owner deletion.
 - Public privacy, account-deletion and support pages, plus Arabic/English listing drafts.
 - Unused Android camera, microphone, activity recognition, background location and broad media/storage permissions blocked. Advertising-ID permission is blocked in this release. Foreground prayer location, notifications, exact-alarm access and foreground audio playback need their applicable current Play declarations.
@@ -25,7 +25,7 @@ In Play Console, select the actual intended age groups: 13–15, 16–17 and 18+
 
 `release.config.json` records `minimumAge: 13`, `releaseScope: full-features-13-plus` and `ownerReleaseApproved: false`. This is a declared target audience, not an implemented age-verification system. Public submission remains blocked pending native testing, deployed policies and owner review.
 
-Live ads remain off. Existing conservative SDK child/under-age flags are intentionally retained until an appropriate age/consent design is reviewed; 13+ does not mean every user is above every region's consent age. Do not simply mark all users as adults. Review these flags, the SDK's current policy requirements and actual native behavior before enabling ads.
+Live Android ads are configured for the production profile; internal/preview builds use Google test IDs. Conservative teen and under-age-consent treatment is applied; 13+ does not mean every user is above every region's consent age. Do not simply mark all users as adults. Review these flags, the SDK's current policy requirements and actual native behavior before enabling ads.
 
 ## Android startup recovery
 

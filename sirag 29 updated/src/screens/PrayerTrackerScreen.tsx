@@ -49,6 +49,7 @@ export default function PrayerTrackerScreen({ navigation, route }: any) {
     notificationConfig,
     checkins,
     isRestDayToday,
+    isFemale,
     changeCity,
     changeMethod,
     changeMadhab,
@@ -75,8 +76,8 @@ export default function PrayerTrackerScreen({ navigation, route }: any) {
   // Next prayer
   const nextPrayerKey = windowInfo.nextPrayer;
   const nextPrayerInfo = prayers.find((p) => p.id === nextPrayerKey) || prayers[0];
-  const nextPrayerTime = nextPrayerKey && todayTimes[nextPrayerKey]
-    ? formatPrayerClock(todayTimes[nextPrayerKey], language === 'ar' ? 'ar' : 'en')
+  const nextPrayerTime = windowInfo.nextPrayerTime
+    ? formatPrayerClock(windowInfo.nextPrayerTime, language === 'ar' ? 'ar' : 'en')
     : '--:--';
 
   // Completed count for today
@@ -186,22 +187,22 @@ export default function PrayerTrackerScreen({ navigation, route }: any) {
         </TouchableOpacity>
 
         {/* Rest Day Banner */}
-        {isRestDayToday && (
+        {isFemale && isRestDayToday && (
           <View style={[styles.restDayNotice, { backgroundColor: '#E8F5E9', borderColor: '#A5D6A7' }]}>
             <Text style={styles.restDayNoticeEmoji}>🌿</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.restDayNoticeTitle}>
-                {language === 'ar' ? 'يوم راحة مبارك' : 'Rest Day Active'}
+                {language === 'ar' ? 'اليوم عذر شرعي' : 'Excused today'}
               </Text>
               <Text style={styles.restDayNoticeDesc}>
                 {language === 'ar'
-                  ? 'تم إيقاف تتبع الصلوات لليوم بناءً على رغبتك دون كسر التتابع ودون أي نقص في رصيدك.'
-                  : 'Prayer tracking paused for today without breaking streaks or penalties.'}
+                  ? 'تُستثنى صلوات اليوم من الأهداف والتذكيرات، دون تسجيلها كصلوات مؤدّاة أو منح نقاط صلاة. مكافآت الأنشطة الأخرى مستمرة.'
+                  : 'Today is excluded from prayer goals and reminders. No prayers or prayer points are fabricated; other activity rewards remain available.'}
               </Text>
             </View>
-            <TouchableOpacity onPress={toggleRestDay} style={styles.cancelRestBtn}>
+            <TouchableOpacity onPress={() => void toggleRestDay().catch(() => Alert.alert('تعذّر الحفظ', 'حاولي مرة أخرى.'))} style={styles.cancelRestBtn}>
               <Text style={styles.cancelRestBtnText}>
-                {language === 'ar' ? 'استئناف' : 'Resume'}
+                {language === 'ar' ? 'إلغاء العذر' : 'End exemption'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -220,7 +221,7 @@ export default function PrayerTrackerScreen({ navigation, route }: any) {
                 <Text style={styles.heroLabel}>
                   {language === 'ar' ? 'صلوات اليوم' : "Today's Prayers"}
                 </Text>
-                <Text style={styles.heroVal}>{completedCount} من ٥</Text>
+                <Text style={styles.heroVal}>{isRestDayToday ? (language === 'ar' ? 'مستثناة اليوم' : 'Exempt today') : `${completedCount} من ٥`}</Text>
               </View>
               <View style={styles.heroDivider} />
               <View style={styles.heroCol}>
@@ -249,20 +250,21 @@ export default function PrayerTrackerScreen({ navigation, route }: any) {
             </View>
 
             {/* Rest Day Action Button */}
-            {!isRestDayToday && (
+            {isFemale && !isRestDayToday && (
               <TouchableOpacity
                 style={styles.restDayActionBtn}
-                onPress={toggleRestDay}
+                onPress={() => void toggleRestDay().catch(() => Alert.alert('تعذّر الحفظ', 'حاولي مرة أخرى.'))}
                 activeOpacity={0.8}
               >
                 <Text style={styles.restDayActionText}>
-                  {language === 'ar' ? 'خذ استراحة اليوم (يوم راحة 🌿)' : 'Take a Rest Day 🌿'}
+                  {language === 'ar' ? 'اليوم عذر شرعي 🌿' : 'Excused today 🌿'}
                 </Text>
               </TouchableOpacity>
             )}
           </LinearGradient>
         </View>
 
+        <TouchableOpacity onPress={() => navigation.navigate('Sunnah')} style={[styles.locationStrip, { backgroundColor: colors.surface }]}><Text style={[styles.locationTitle, { color: colors.textPrimary }]}>السنن الرواتب · سجّل ما صليت قبل الفريضة وبعدها ←</Text></TouchableOpacity>
         {/* List of 5 Prayers */}
         <View style={styles.prayerList}>
           {prayers.map((prayer) => {
@@ -709,6 +711,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   cancelRestBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
     backgroundColor: '#C8E6C9',
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -782,18 +786,11 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   restDayActionBtn: {
-    alignSelf: 'center',
-    marginTop: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 8,
+    alignSelf: 'stretch', minHeight: 52, marginTop: 12, padding: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)', borderRadius: 14,
+    alignItems: 'center', justifyContent: 'center',
   },
-  restDayActionText: {
-    color: '#F2C66D',
-    fontSize: 11,
-    fontFamily: 'IBMPlexSansArabic-Bold',
-  },
+  restDayActionText: { color: '#F2C66D', fontSize: 14, fontFamily: 'IBMPlexSansArabic-Bold', textAlign: 'center' },
   prayerList: {
     gap: 10,
     marginBottom: 16,
