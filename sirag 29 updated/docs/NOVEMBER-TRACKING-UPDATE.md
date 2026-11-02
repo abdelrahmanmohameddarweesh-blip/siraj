@@ -1,5 +1,7 @@
 # Prayer, Athkar, onboarding and ads update — 1 November 2026
 
+> Latest onboarding replacement: [visual stories and homepage spotlight tour](STORIES-AND-HOMEPAGE-TOUR.md). The earlier card-based onboarding descriptions below are superseded.
+
 ## What changed
 
 - Prayer reminder CTA is fixed above the bottom safe area, shows a busy state, reports permission denial and confirms the actual number of scheduled prayer requests. It waits for the scheduler rather than silently queuing an update. Web explains that notifications require the native app.

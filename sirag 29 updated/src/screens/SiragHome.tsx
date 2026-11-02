@@ -1,6 +1,13 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { TOUR_KEY } from "../onboarding/AppTourScreen";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import SirajWordmark from "../brand/SirajWordmark";
+import HomeCoachmarks from "../onboarding/HomeCoachmarks";
+import { useHomeCoachmarks } from "../onboarding/useHomeCoachmarks";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+} from "react";
 import {
   Alert,
   AppState,
@@ -80,6 +87,9 @@ function habitDestination(
 }
 export default function SiragHome({ navigation }: any) {
   const insets = useSafeAreaInsets();
+  const homeScroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const homeScrollY = useRef(0);
+  const guide = useHomeCoachmarks(navigation, homeScroll, homeScrollY, insets);
   const { theme, appearance, setAppearance } = useTheme();
   const palette = homePalettes[theme];
   const s = useMemo(() => styles(palette), [palette]);
@@ -133,17 +143,11 @@ export default function SiragHome({ navigation }: any) {
     const timer = setInterval(() => setNow(Date.now()), 15000);
     return () => clearInterval(timer);
   }, []);
-  useFocusEffect(useCallback(() => {
-    let active = true;
-    void Promise.all([AsyncStorage.getItem(TOUR_KEY), loadProfile()]).then(async ([seen, profile]) => {
-      if (active && !seen && profile) { await AsyncStorage.setItem(TOUR_KEY, 'offered'); if (active) navigation.navigate('AppTour'); }
-    }).catch(() => {});
-    return () => { active = false; };
-  }, [navigation]));
   const plans = sources?.plans || [];
   const daily = plans.filter(
     (p) =>
-      (!isRestDayToday || p.category !== "الصلاة") && (p.frequency === "daily" || new Date(day + "T12:00:00").getDay() === 5),
+      (!isRestDayToday || p.category !== "الصلاة") &&
+      (p.frequency === "daily" || new Date(day + "T12:00:00").getDay() === 5),
   );
   const logs = sources?.logs[day] || {};
   const done = daily.filter(
@@ -257,6 +261,12 @@ export default function SiragHome({ navigation }: any) {
     <View style={s.root}>
       <StatusBar barStyle={night ? "light-content" : "dark-content"} />
       <ScrollView
+        ref={homeScroll}
+        onScroll={(event) => {
+          homeScrollY.current = event.nativeEvent.contentOffset.y;
+        }}
+        scrollEventThrottle={16}
+        scrollEnabled={!guide.visible}
         key={theme}
         refreshControl={
           <RefreshControl
@@ -287,15 +297,15 @@ export default function SiragHome({ navigation }: any) {
           <View style={s.topbar}>
             <Pressable
               accessibilityRole="button"
+              ref={guide.targets.reminders}
+              collapsable={false}
               accessibilityLabel="تنبيهات الصلاة"
               onPress={() => open("PrayerReminders")}
               style={s.iconButton}
             >
               <SirajIcon name="bell" color={palette.accent} />
             </Pressable>
-            <Text accessibilityRole="header" style={s.brand}>
-              سراج
-            </Text>
+            <SirajWordmark width={86} height={58} color={palette.accent} />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="المظهر والملف الشخصي"
@@ -314,6 +324,8 @@ export default function SiragHome({ navigation }: any) {
         <View style={s.body}>
           <Pressable
             accessibilityRole="button"
+            ref={guide.targets.prayer}
+            collapsable={false}
             accessibilityLabel="الصلاة القادمة، افتح متتبع الصلاة"
             onPress={() => open("PrayerTracker")}
             style={({ pressed }) => [
@@ -415,7 +427,11 @@ export default function SiragHome({ navigation }: any) {
               {error}
             </Text>
           )}
-          <View style={s.shortcuts}>
+          <View
+            ref={guide.targets.shortcuts}
+            collapsable={false}
+            style={s.shortcuts}
+          >
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="القرآن الكريم، اقرأ واستمع"
@@ -577,6 +593,8 @@ export default function SiragHome({ navigation }: any) {
             <Pressable
               accessibilityRole="button"
               onPress={() => open("HabitSetup", { first: false })}
+              ref={guide.targets.habits}
+              collapsable={false}
               style={s.addHabit}
             >
               <SirajIcon name="plus" size={15} color={palette.accent} />
@@ -593,6 +611,8 @@ export default function SiragHome({ navigation }: any) {
             ).map(([icon, label, screen]) => (
               <Pressable
                 key={screen}
+                ref={screen === "Insights" ? guide.targets.reports : undefined}
+                collapsable={false}
                 accessibilityRole="button"
                 onPress={() => open(screen)}
                 style={s.tool}
@@ -606,6 +626,8 @@ export default function SiragHome({ navigation }: any) {
           </View>
           <Pressable
             accessibilityRole="button"
+            ref={guide.targets.circle}
+            collapsable={false}
             accessibilityLabel="صحبة · رحلتك أجمل مع صحبة"
             onPress={() => open("Sohba")}
             style={{
@@ -694,6 +716,7 @@ export default function SiragHome({ navigation }: any) {
       </ScrollView>
       <BottomDock
         navigation={navigation}
+        oasisTourRef={guide.targets.oasis}
         active="Home"
         bottom={insets.bottom}
       />
@@ -736,7 +759,30 @@ export default function SiragHome({ navigation }: any) {
             {modal === "appearance" && (
               <>
                 <Text style={s.sheetLabel}>المظهر</Text>
-                <Pressable accessibilityRole="button" style={s.sheetButton} onPress={() => { setModal(null); open('AppTour'); }}><Text style={s.habitName}>دليل سراج · جولة تفاعلية</Text><SirajIcon name="arrow" color={palette.accent} /></Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  style={s.sheetButton}
+                  onPress={() => {
+                    setModal(null);
+                    setTimeout(() => guide.start(), 250);
+                  }}
+                >
+                  <Text style={s.habitName}>
+                    دليل الصفحة الرئيسية · أعد الجولة
+                  </Text>
+                  <SirajIcon name="arrow" color={palette.accent} />
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  style={s.sheetButton}
+                  onPress={() => {
+                    setModal(null);
+                    open("AppTour", { replay: true });
+                  }}
+                >
+                  <Text style={s.habitName}>قصص البداية · شاهدها مجددًا</Text>
+                  <SirajIcon name="arrow" color={palette.accent} />
+                </Pressable>
                 <View style={s.themeOptions}>
                   {(
                     [
@@ -961,6 +1007,7 @@ export default function SiragHome({ navigation }: any) {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      <HomeCoachmarks guide={guide} />
     </View>
   );
 }

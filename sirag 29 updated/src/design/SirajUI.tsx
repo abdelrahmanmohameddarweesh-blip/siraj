@@ -61,10 +61,12 @@ export function BottomDock({
   navigation,
   active,
   bottom = 0,
+  oasisTourRef,
 }: {
   navigation: any;
   active: string;
   bottom?: number;
+  oasisTourRef?: React.RefObject<React.ComponentRef<typeof View> | null>;
 }) {
   const { theme } = useTheme();
   const palette = homePalettes[theme];
@@ -89,6 +91,8 @@ export function BottomDock({
         {tabs.map(([icon, label, route]) => (
           <Pressable
             key={route}
+            ref={route === "Oasis" ? oasisTourRef : undefined}
+            collapsable={false}
             accessibilityRole="tab"
             accessibilityLabel={label}
             accessibilityState={{ selected: active === route }}
