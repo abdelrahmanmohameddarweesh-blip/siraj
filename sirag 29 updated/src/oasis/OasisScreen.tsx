@@ -5,8 +5,6 @@ import {
   Alert,
   AppState,
   StatusBar,
-  Pressable,
-  Text,
   StyleSheet,
   View,
 } from "react-native";
@@ -16,7 +14,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
 import * as Haptics from "expo-haptics";
 import * as Notifications from "expo-notifications";
-import { C, F } from "../ui/theme";
 import { OASIS_HTML } from "./oasisHtml";
 import { PrayerCheckinSheet } from "../components/prayer/PrayerCheckinSheet";
 import { syncNotificationsSoon } from "../notifications/scheduler";
@@ -154,7 +151,7 @@ export default function OasisScreen({ navigation }: any) {
     stateRef.current = state;
     const { habits, ledger } = await refresh();
     const ads = await loadAdRewards().catch(() => null);
-    return `window.__SIRAG_INIT=${JSON.stringify({ state, habits, grants: [...ledger.pending, ...(ads?.pending || [])], adsOffers: __DEV__ || adSupport().available, dev: __DEV__, insets: { top: insets.top, bottom: 0 } })};true;`;
+    return `window.__SIRAG_INIT=${JSON.stringify({ state, habits, grants: [...ledger.pending, ...(ads?.pending || [])], adsOffers: __DEV__ || adSupport().available, dev: __DEV__, insets: { top: insets.top, bottom: insets.bottom } })};true;`;
   }, [refresh, insets.top, insets.bottom]);
   useEffect(() => {
     let alive = true;
@@ -190,7 +187,7 @@ export default function OasisScreen({ navigation }: any) {
   useEffect(() => {
     if (!ready.current) return;
     web.current?.injectJavaScript(
-      `window.SiragOasis&&window.SiragOasis.setInsets(${JSON.stringify({ top: insets.top, bottom: 0 })});true;`,
+      `window.SiragOasis&&window.SiragOasis.setInsets(${JSON.stringify({ top: insets.top, bottom: insets.bottom })});true;`,
     );
   }, [insets.top, insets.bottom]);
 
@@ -327,7 +324,9 @@ export default function OasisScreen({ navigation }: any) {
           else if (
             msg.to === "Home" ||
             msg.to === "PrayerTracker" ||
-            msg.to === "QuranReader"
+            msg.to === "QuranReader" ||
+            msg.to === "Adhkar" ||
+            msg.to === "Insights"
           )
             navigation.navigate(msg.to);
           break;
@@ -377,31 +376,6 @@ export default function OasisScreen({ navigation }: any) {
           <ActivityIndicator color="#f1c76a" />
         </View>
       )}
-      <View
-        style={[
-          styles.navigation,
-          { paddingBottom: Math.max(8, insets.bottom) },
-        ]}
-      >
-        {(
-          [
-            ["Home", "الرئيسية"],
-            ["QuranReader", "القرآن"],
-            ["Adhkar", "الأذكار"],
-            ["HabitSetup", "عاداتي"],
-          ] as const
-        ).map(([screen, label]) => (
-          <Pressable
-            key={screen}
-            accessibilityRole="button"
-            accessibilityLabel={`من الواحة إلى ${label}`}
-            onPress={() => navigation.navigate(screen)}
-            style={styles.navButton}
-          >
-            <Text style={styles.navText}>{label}</Text>
-          </Pressable>
-        ))}
-      </View>
       <RewardedOfferSheet
         placement={adPlacement}
         onClose={() => setAdPlacement(null)}
@@ -420,21 +394,6 @@ export default function OasisScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-  navigation: {
-    flexDirection: "row-reverse",
-    backgroundColor: C.card,
-    borderTopWidth: 1,
-    borderColor: C.line,
-    paddingTop: 6,
-    paddingHorizontal: 8,
-  },
-  navButton: {
-    flex: 1,
-    minHeight: 46,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  navText: { fontFamily: F.s, color: C.green, fontSize: 13 },
   root: { flex: 1, backgroundColor: "#0f2a24" },
   web: { flex: 1, backgroundColor: "#cfe3e6" },
   loading: { flex: 1, alignItems: "center", justifyContent: "center" },

@@ -15,9 +15,9 @@ src = src.replace('env(safe-area-inset-top,0px)', 'var(--sat,env(safe-area-inset
 src = src.replace('env(safe-area-inset-bottom,0px)', 'var(--sab,env(safe-area-inset-bottom,0px))')
 rep('<style>', '<style>\n.bridge-only{display:none}.is-bridge .bridge-only{display:grid}.is-bridge .demo-only{display:none!important}')
 
-# home button (bridge only) and demo-only markers
-rep('<button class="round glass" id="soundBtn"></button>',
-    '<button class="round glass bridge-only" id="homeBtn" aria-label="الصفحة الرئيسية"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 11l8-7 8 7"/><path d="M6 10v10h12V10"/></svg></button><button class="round glass" id="soundBtn"></button>')
+# Navigation floats inside the scene HUD; it consumes no WebView height.
+rep('<div class="pill glass" id="cLanterns"></div>',
+    '<div style="display:flex;align-items:flex-start;gap:8px"><button class="pill glass bridge-only" id="homeBtn" aria-label="فتح قائمة التنقل" aria-haspopup="dialog" style="min-height:44px;padding:7px 12px;font-size:13px;grid-auto-flow:column"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>التنقل</button><div class="pill glass" id="cLanterns"></div></div>')
 rep('<div class="dfoot">', '<div class="dfoot demo-only">')
 
 # bridge globals at the top of the script
@@ -61,7 +61,16 @@ rep("$('dayLabel').textContent = dc<HABITS.length ? 'اليوم '+ar(S.day)", "c
 rep(": 'اليوم '+ar(S.day)+'، أكملتها كلها';", ": 'اليوم '+ar(dayN)+'، أكملتها كلها';")
 
 # menu: demo tools only in development builds
-rep("$('menuBtn').onclick = menuSheet;", "$('menuBtn').onclick = menuSheet;\nif(!DEV) $('menuBtn').style.display = 'none';\n$('homeBtn').onclick = ()=>toRN({type:'navigate', to:'Home'});")
+rep("$('menuBtn').onclick = menuSheet;", "$('menuBtn').onclick = menuSheet;\nif(!DEV) $('menuBtn').style.display = 'none';\n$('homeBtn').onclick = navigationSheet;")
+
+# Reuse the existing accessible sheet and its focus restoration; no permanent footer.
+rep("function menuSheet(){", """function navigationSheet(){
+  const links=[['Home','الرئيسية','عد إلى ملخص يومك'],['PrayerTracker','صلواتي','سجّل صلاتك وسننها'],['QuranReader','القرآن','وردك من القراءة والاستماع'],['Adhkar','الأذكار','أذكار الصباح والمساء'],['HabitSetup','عاداتي','إضافة العادات وإدارتها'],['Insights','إحصائياتي','شاهد أثر مداومتك']];
+  openSheet('<h2>إلى أين تريد الذهاب؟</h2><p>واحتك محفوظة، ويمكنك العودة إليها في أي وقت.</p><div class="menu-list">'+links.map(([to,label,hint])=>'<button data-nav="'+to+'"><span aria-hidden="true">'+(to==='Home'?'⌂':'←')+'</span><div>'+label+'<span>'+hint+'</span></div></button>').join('')+'</div><button class="secondary" id="navClose">البقاء في الواحة</button>');
+  $('navClose').onclick=closeSheet;
+  $('sheetBody').querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{ clearTimeout(saveT);toRN({type:'save',state:S});closeSheet();toRN({type:'navigate',to:b.dataset.nav}); });
+}
+function menuSheet(){""")
 
 # empty-state chip to add habits
 rep("  $('habitRing').innerHTML = ringSVG(dc, HABITS.length);",
