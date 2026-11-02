@@ -62,7 +62,7 @@ export default function HomeCoachmarks({
             d={
               box ? maskPath(width, height, box) : `M0 0H${width}V${height}H0Z`
             }
-            fill="rgba(3,15,16,0.82)"
+            fill="rgba(3,15,16,0.48)"
             fillRule="evenodd"
           />
           {box && (

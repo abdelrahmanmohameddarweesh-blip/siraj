@@ -25,7 +25,9 @@ export function SunnahOptions({
   const [log, setLog] = useState<SunnahLog>({}),
     [ready, setReady] = useState(false),
     [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [dirty, setDirty] = useState(false),
+    [saved, setSaved] = useState(false);
   const { isRestDayToday, todayTimes } = usePrayer();
   useFocusEffect(
     useCallback(() => {
@@ -36,6 +38,8 @@ export function SunnahOptions({
           if (active) {
             setLog(v);
             setReady(true);
+            setDirty(false);
+            setSaved(false);
           }
         })
         .catch(() => {
@@ -46,7 +50,7 @@ export function SunnahOptions({
       };
     }, [date]),
   );
-  const save = async (slot: SUNNAH_SLOTS_TYPE, count: number) => {
+  const save = async () => {
     if (busy || !ready) return;
     if (
       date === localDay() &&
@@ -63,10 +67,16 @@ export function SunnahOptions({
     setError("");
     try {
       const next = await updateJSON<SunnahLog>(SUNNAH_KEY, {}, (old) =>
-        setSunnah(old, date, slot, count),
+        slotsForPrayer(prayer).reduce(
+          (next, slot) =>
+            setSunnah(next, date, slot.id, log[date]?.[slot.id] || 0),
+          old,
+        ),
       );
       setLog(next);
       await logKind(["sunnah"], sunnahTotal(next, date), "set", date);
+      setDirty(false);
+      setSaved(true);
     } catch {
       setError("تعذّر حفظ السنّة. حاول مرة أخرى.");
     } finally {
@@ -91,7 +101,12 @@ export function SunnahOptions({
                   accessibilityState={{
                     checked: (log[date]?.[slot.id] || 0) === n,
                   }}
-                  onPress={() => void save(slot.id, n)}
+                  onPress={() => {
+                    setLog((old) => setSunnah(old, date, slot.id, n));
+                    setDirty(true);
+                    setSaved(false);
+                    setError("");
+                  }}
                   style={[
                     s.chip,
                     (log[date]?.[slot.id] || 0) === n && s.selected,
@@ -111,11 +126,27 @@ export function SunnahOptions({
           </View>
         </View>
       ))}
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`حفظ سنن ${PRAYER_AR[prayer]}`}
+        disabled={busy || !ready || !dirty}
+        onPress={() => void save()}
+        style={[s.save, (!dirty || busy) && { opacity: 0.55 }]}
+      >
+        <Text style={s.saveText}>
+          {busy ? "جارٍ الحفظ…" : `حفظ سنن ${PRAYER_AR[prayer]}`}
+        </Text>
+      </Pressable>
+      {saved && (
+        <Text accessibilityLiveRegion="polite" style={s.copy}>
+          ✓ تم حفظ سنن {PRAYER_AR[prayer]}، ويمكنك تسجيل الباقي لاحقًا.
+        </Text>
+      )}
       {!!error && <Text style={s.error}>{error}</Text>}
     </View>
   );
 }
-type SUNNAH_SLOTS_TYPE = import("./sunnahModel").SunnahSlot;
+
 export default function SunnahScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   return (
@@ -134,8 +165,9 @@ export default function SunnahScreen({ navigation }: any) {
         }}
       >
         <Text style={s.copy}>
-          سجّل كل سنّة قبل الفريضة أو بعدها بصورة مستقلة. لا تُسجّل أي ركعات
-          تلقائيًا. هذه متابعة الرواتب الاثنتي عشرة، ولا تشمل كل النوافل.
+          اختر الركعات ثم اضغط حفظ أسفل الصلاة. يمكنك حفظ سنن صلاة واحدة دون
+          إكمال باقي اليوم. لا تُسجّل أي ركعات تلقائيًا. هذه متابعة الرواتب
+          الاثنتي عشرة، ولا تشمل كل النوافل.
         </Text>
         {PRAYER_IDS.map((p) => (
           <SunnahOptions key={p} prayer={p} />
@@ -145,6 +177,15 @@ export default function SunnahScreen({ navigation }: any) {
   );
 }
 const s = StyleSheet.create({
+  save: {
+    minHeight: 48,
+    borderRadius: 13,
+    backgroundColor: C.green,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 12,
+  },
+  saveText: { fontFamily: F.s, color: "#fff", textAlign: "center" },
   root: { flex: 1, backgroundColor: C.paper },
   head: { padding: 18, flexDirection: "row", justifyContent: "space-between" },
   card: {

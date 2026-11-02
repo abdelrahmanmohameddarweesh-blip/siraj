@@ -2,6 +2,8 @@
 
 > Latest onboarding replacement: [visual stories and homepage spotlight tour](STORIES-AND-HOMEPAGE-TOUR.md). The earlier card-based onboarding descriptions below are superseded.
 
+> Latest UI and oasis changes: [daily tracking and oasis care](OASIS-CARE-AND-DAILY-TRACKING.md).
+
 ## Current state — not published
 
 The owner has an existing Play developer account, so this workflow does not need another registration. Support/privacy email: `abdelrahman.mohamed.darweesh@gmail.com`. The existing Play Console developer display name has not been changed.

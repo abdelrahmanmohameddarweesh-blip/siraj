@@ -33,6 +33,13 @@ body{background:#0b1714;color:var(--ink);font-family:"IBM Plex Sans Arabic",Taho
 button{font:inherit;color:inherit}
 button:focus-visible,[tabindex]:focus-visible,label:focus-within{outline:3px solid var(--brass);outline-offset:2px}
 
+/* Touch selection should never leave a rectangular browser focus frame on a tree.
+   Keyboard focus uses the existing ground hit ellipse instead. */
+.plot{outline:none!important;-webkit-tap-highlight-color:transparent}
+.plot:focus-visible>ellipse:first-child{stroke:#f4d694;stroke-width:1.8;stroke-dasharray:3 2}
+.care-list{display:grid;gap:10px;margin:14px 0}.care-item{padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface-2)}
+.care-item b{display:block}.care-item p{font-size:13px;margin:6px 0;color:var(--muted)}.care-item button{width:100%;min-height:46px;border:0;border-radius:12px;background:var(--emerald);color:var(--on-emerald);cursor:pointer}.care-item button:disabled{opacity:.5;cursor:default}
+.quest-row{padding:12px 0;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center}.quest-row span{font-size:13px;color:var(--muted)}
 /* full-screen game */
 .game{position:fixed;top:0;bottom:0;left:0;right:0;margin:0 auto;width:100%;max-width:480px;overflow:hidden;background:#cfe3e6;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 .scene{position:absolute;inset:0}
@@ -295,6 +302,7 @@ canvas.layer,#tint{pointer-events:none}
       <div class="pill glass" id="cLanterns"></div>
       <div class="side">
         <button class="round glass" id="mapBtn"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg>الرحلة</button>
+        <button class="round glass" id="careBtn" aria-label="مهام الواحة والعناية بالسكان"><span aria-hidden="true">🌿</span>العناية</button>
         <button class="round glass" id="resBtn"><svg viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><ellipse cx="12" cy="16" rx="4.6" ry="3.8"/><circle cx="6.5" cy="10.5" r="2"/><circle cx="17.5" cy="10.5" r="2"/><circle cx="9.5" cy="6.5" r="2"/><circle cx="14.5" cy="6.5" r="2"/></svg>السكان</button>
       </div>
     </div>
@@ -335,6 +343,10 @@ const rand = (a,b) => a + Math.random()*(b-a);
 /* ================= content ================= */
 const GENERIC = {ayah:'﴿وأنبتنا فيها من كل زوج بهيج﴾', ref:'سورة ق، الآية ٧'};
 const PLANTS = {
+  acacia:{name:'سنط', ayah:GENERIC.ayah, ref:GENERIC.ref, leaf:'#65924c', en:'acacia tree with a broad umbrella canopy', fam:'leafy', tree:true},
+  lemon:{name:'ليمون', ayah:GENERIC.ayah, ref:GENERIC.ref, leaf:'#3d8c40', en:'lemon tree with yellow fruit', fam:'leafy', tree:true},
+  almond:{name:'لوز مزهر', ayah:GENERIC.ayah, ref:GENERIC.ref, leaf:'#72905c', en:'almond tree with pale pink blossoms', fam:'leafy', tree:true, flower:true},
+  moringa:{name:'مورينجا', ayah:GENERIC.ayah, ref:GENERIC.ref, leaf:'#6ca357', en:'moringa tree with delicate leaves', fam:'leafy', tree:true},
   palm:{name:'نخلة', ayah:'﴿والنخل باسقات لها طلع نضيد﴾', ref:'سورة ق، الآية ١٠', leaf:'#5a9a48', en:'young date palm tree', fam:'palm', tree:true},
   basil:{name:'ريحان', ayah:'﴿والحب ذو العصف والريحان﴾', ref:'سورة الرحمن، الآية ١٢', leaf:'#4f9a4f', en:'sweet basil bush with small lilac flowers', fam:'leafy', flower:true},
   grass:{name:'عشب', ayah:'﴿فأخرجنا به نبات كل شيء فأخرجنا منه خضرا﴾', ref:'سورة الأنعام، الآية ٩٩', leaf:'#7cae45', en:'lush tuft of green desert grass with a few seed heads', fam:'blade'},
@@ -356,19 +368,19 @@ const PLANTS = {
   ginger:{name:'زنجبيل', ayah:'﴿ويسقون فيها كأسا كان مزاجها زنجبيلا﴾', ref:'سورة الإنسان، الآية ١٧', leaf:'#58994a', en:'clump of ginger plants with tall reed-like stems and long lance leaves', fam:'blade'}
 };
 const LOCS = [
-  {name:'واحة البداية', plots:16, plants:['palm','basil','grass','chamomile','wheat'], ground:'#e8c78c', far:'#dcb176', hills:null, en:'soft golden sand dunes rolling to the horizon'},
-  {name:'وادي الزيتون', plots:20, plants:['olive','fig','lavender','mustard'], ground:'#dcc48d', far:'#c4a676', hills:'#a99070', en:'a sandy valley floor with low rocky hills in the distance'},
+  {name:'واحة البداية', plots:16, plants:['palm','olive','acacia','lemon','basil','grass','chamomile','wheat'], ground:'#e8c78c', far:'#dcb176', hills:null, en:'soft golden sand dunes rolling to the horizon'},
+  {name:'وادي الزيتون', plots:20, plants:['fig','almond','lavender','mustard'], ground:'#dcc48d', far:'#c4a676', hills:'#a99070', en:'a sandy valley floor with low rocky hills in the distance'},
   {name:'بستان الرمان', plots:24, plants:['pomegranate','grape','anemone','cucumber'], ground:'#d8bf8b', far:'#bc966d', hills:'#977a5d', en:'warm sandy ground with distant terracotta mountains'},
-  {name:'ظلال السدر', plots:28, plants:['sidr','gourd','tamarisk','arak'], ground:'#d3c18f', far:'#ad9d72', hills:'#887b5c', en:'pale sand plain with tall sandstone cliffs on the horizon'},
+  {name:'ظلال السدر', plots:28, plants:['sidr','moringa','gourd','tamarisk','arak'], ground:'#d3c18f', far:'#ad9d72', hills:'#887b5c', en:'pale sand plain with tall sandstone cliffs on the horizon'},
   {name:'حديقة النور', plots:32, plants:['datepalm','ginger'], ground:'#cfc897', far:'#a8a87b', hills:'#7f8a66', en:'a broad fertile plain with faint green hills on the horizon'}
 ];
 const RESIDENTS = [
   {id:'fish', emoji:'🐟', name:'سمكات العين', hint:'تأتي مع أول فانوس تضيئه في الواحة', title:'سمكات صغيرة في العين', body:'صار ماء العين حيًّا. راقبه جيدًا، قد ترى سمكة تقفز.', back:'عادت السمكات'},
   {id:'butterflies', emoji:'🦋', name:'الفراشات', hint:'تأتي حين تكتمل أول نبتة مزهرة', title:'وصلت الفراشات', body:'أزهار واحتك جذبت أول الفراشات.', back:'عادت الفراشات'},
   {id:'ducks', emoji:'🦆', name:'عائلة البط', hint:'تأتي حين تكتمل ٤ نبتات', title:'البط سكن واحتك', body:'عائلة بط صغيرة وجدت عينك صافية فبقيت. تعال شاهدها تسبح.', back:'عاد البط'},
-  {id:'sparrows', emoji:'🐦', name:'العصافير', hint:'تأتي حين تكتمل شجرتان', title:'العصافير بنت أعشاشها', body:'أشجارك صارت بيتًا للعصافير.', ayah:'﴿ألم يروا إلى الطير مسخرات في جو السماء﴾', ref:'سورة النحل، الآية ٧٩', back:'عادت العصافير'},
+  {id:'sparrows', emoji:'🐦', name:'العصافير', hint:'ابنِ عشًا، أو أكمل شجرتين', title:'العصافير بنت أعشاشها', body:'وجدت العصافير مكانًا آمنًا في واحتك. شاهدها قرب العش أو الأشجار.', ayah:'﴿ألم يروا إلى الطير مسخرات في جو السماء﴾', ref:'سورة النحل، الآية ٧٩', back:'عادت العصافير'},
   {id:'bees', emoji:'🐝', name:'النحل', hint:'يأتي حين تكتمل ٣ نبتات مزهرة', title:'النحل يزور أزهارك', body:'ثلاث نبتات مزهرة كانت كافية لتدعو النحل.', ayah:'﴿وأوحى ربك إلى النحل﴾', ref:'سورة النحل، الآية ٦٨', back:'عاد النحل'},
-  {id:'rabbit', emoji:'🐇', name:'الأرنب', hint:'يأتي حين تكتمل ٨ نبتات', title:'أرنب صغير في واحتك', body:'وجد بين نبتاتك ظلًّا ومأوى. قد تراه يقفز بينها.', back:'عاد الأرنب'},
+  {id:'rabbit', emoji:'🐇', name:'الأرنب', hint:'ضع طعامًا له، أو أكمل ٨ نبتات', title:'أرنب صغير في واحتك', body:'وجد بين نبتاتك ظلًّا ومأوى. قد تراه يقفز بينها.', back:'عاد الأرنب'},
   {id:'hoopoe', emoji:'🪶', name:'الهدهد', hint:'يأتي بعد ٧ أيام من العمل الطيب', title:'زارك الهدهد', body:'سبعة أيام من المداومة، والهدهد جاء يتفقد واحتك.', ayah:'﴿وتفقد الطير فقال ما لي لا أرى الهدهد﴾', ref:'سورة النمل، الآية ٢٠', back:'عاد الهدهد'},
   {id:'owl', emoji:'🦉', name:'البومة', hint:'تأتي حين تضيء ٣ فوانيس', title:'بومة تسهر مع فوانيسك', body:'ثلاثة فوانيس تضيء ليلك، وبومة اختارت أن تسهر معها. تظهر ليلًا.', back:'عادت البومة', night:true},
   {id:'camel', emoji:'🐪', name:'الإبل', hint:'تأتي حين تكتمل معظم نبتات الواحة', title:'قافلة توقفت عند واحتك', body:'واحتك صارت خضراء بما يكفي لتستريح عندها الإبل.', ayah:'﴿أفلا ينظرون إلى الإبل كيف خلقت﴾', ref:'سورة الغاشية، الآية ١٧', back:'عادت الإبل'},
@@ -514,6 +526,10 @@ function genTree(r, cfg){
   return p.out();
 }
 const TREES = {
+  acacia:{h:43,spread:31,shape:'umbrella',w0:5,trunk:'#79532f',pal:['#2b4b2a','#426b32','#5d8b42','#81ab5a','#b1c879'],size:2.4,lw:.45,n:250},
+  lemon:{h:35,spread:22,shape:'round',w0:4,trunk:'#735536',pal:['#1b4923','#2c6a30','#408d3f','#65a953','#95c579'],size:4,lw:.4,n:180,fruit:{c:['#f5d73f','#e6bf20'],r:2,n:12}},
+  almond:{h:39,spread:25,shape:'round',w0:4,trunk:'#8d6e59',pal:['#385537','#557849','#719357','#93ac76','#b9c99e'],size:3,lw:.35,n:100,flowers:{c:'#f4c5ce',n:65,r:1.8}},
+  moringa:{h:46,spread:21,shape:'round',w0:3.5,trunk:'#8b7c62',pal:['#35562d','#4f783e','#6a9952','#8fb870','#bbd29c'],size:2.6,lw:.38,n:240},
   olive:{h:40,spread:23,shape:'round',gnarl:true,w0:5.4,trunk:'#7a6d5c',pal:['#4a5838','#62724a','#7e8f62','#a0b081','#c6d2a9'],size:4.2,lw:.24,n:280,fruit:{c:['#2d3322','#454a2a'],r:1.05,n:18}},
   fig:{h:38,spread:24,shape:'round',w0:5,trunk:'#8d8473',pal:['#1c4320','#2b5f2a','#3e7b37','#599a49','#80b866'],size:6.4,lw:.6,n:105,fruit:{c:['#58284a','#76395f'],r:1.75,n:9}},
   pomegranate:{h:35,spread:21,shape:'round',w0:4,trunk:'#6c5035',pal:['#1b4224','#295d30','#3c7b3f','#589a52','#80b96d'],size:3.4,lw:.36,n:200,fruit:{c:['#a3211c','#c7392b'],r:2.4,n:9,crown:true},flowers:{c:'#ea5a30',n:7,r:1.1}},
@@ -663,17 +679,23 @@ function camel(){
 /* ================= scene geometry ================= */
 const POOL = {x:200, y:418, rx:108, ry:36};
 function plotPositions(n){
-  const pts=[];
+  // Alternating shore / middle / outer sand gives even the first oasis a natural spread.
+  // Stable indices preserve every saved seed and growth stage.
+  const bands=[[],[],[]];
   for(let r=0;r<10;r++){
-    const y=250+r*34, off=(r%2)*29;
-    for(let x=34+off;x<=368;x+=58){
-      const dx=(x-POOL.x)/136, dy=(y-POOL.y)/52;
-      if(dx*dx+dy*dy<1.15) continue;
-      pts.push({x,y,d:Math.hypot((x-POOL.x)/1.5,(y-POOL.y))});
+    const y=252+r*33, off=(r%2)*25;
+    for(let x=30+off;x<=370;x+=52){
+      const j=rng(r*409+x), px=x+(j()-.5)*9, py=y+(j()-.5)*7;
+      const dx=(px-POOL.x)/136, dy=(py-POOL.y)/52;
+      if(dx*dx+dy*dy<1.18) continue;
+      const d=Math.hypot((px-POOL.x)/1.5,py-POOL.y);
+      bands[d<102?0:d<155?1:2].push({x:px,y:py,d});
     }
   }
-  pts.sort((a,b)=>a.d-b.d);
-  return pts.slice(0,n).map((p,i)=>({x:p.x,y:p.y,i,s:1.1+(p.y-250)/306*0.65}));
+  bands.forEach((band,k)=>band.sort((a,b)=>hashStr(Math.round(a.x)+','+Math.round(a.y)+','+k)-hashStr(Math.round(b.x)+','+Math.round(b.y)+','+k)));
+  const pts=[];
+  for(let i=0;pts.length<n;i++){const band=bands[i%3];if(band.length)pts.push(band.shift());if(!bands.some(b=>b.length))break;}
+  return pts.map((p,i)=>({x:p.x,y:p.y,i,s:1.1+(p.y-250)/306*0.65}));
 }
 const LANTERN_POS = (()=>{ const out=[]; for(let k=0;k<12;k++){ const a=Math.PI*(0.08+k*(1.84/11)); out.push({x:POOL.x+Math.cos(a)*122, y:POOL.y+Math.sin(a)*44*(k%2?1:-1)}); } return out; })();
 const SKY = { dawn:['#5f6fa3','#f0b48c'], day:['#7fbfd8','#f4e3ba'], sunset:['#384a7a','#f19a58'], night:['#081630','#1f3459'] };
@@ -750,6 +772,10 @@ function midInner(li, oasis, o){
   });
   if(hasRes(oasis,'hoopoe')) s += '<g transform="translate(146 460) scale(1.45)">'+hoopoe()+'</g>';
   if(oasis.complete) s += '<g transform="translate(316 422) scale(1.6)">'+gazelle()+'</g>';
+  const care=oasis.care||{};
+  if(care.nest) s += '<g data-habitat="nest" transform="translate(330 326)"><ellipse cy="3" rx="14" ry="4" fill="#765936" opacity=".2"/><path d="M0 0v-38" stroke="#87603b" stroke-width="4"/><path d="M-12-35q12 12 24 0l-3 7q-9 7-18 0z" fill="#9d743f" stroke="#624a2e"/><path d="M-10-31l20 3m-17-6l14 8" stroke="#d3b27c"/><ellipse cx="-3" cy="-30" rx="3" ry="2" fill="#f6ecd1"/></g>';
+  if(care.bath) s += '<g data-habitat="bath" transform="translate(70 470)"><ellipse cy="2" rx="15" ry="4" fill="#765936" opacity=".16"/><path d="M0 0v-17m-10 0q10 12 20 0" fill="#bfa17a" stroke="#8f765a" stroke-width="4"/><ellipse cy="-17" rx="11" ry="3" fill="#72bcc2"/></g>';
+  if(care.foodDay===gardenDay()) s += '<g data-habitat="food" transform="translate(300 518)"><ellipse rx="15" ry="5" fill="#997045"/><path d="M-9-1l13 1m-10-3l12 4m-10 1l9-3" stroke="#79a24b" stroke-width="2"/><path d="M-2 0l6-1" stroke="#e9a13a" stroke-width="3"/></g>';
   return s;
 }
 function staticScene(li, oasis, t, p){
@@ -970,6 +996,22 @@ function frame(now){
       if(W.rab){ const el=now-W.rab.t, x=W.rab.dir<0 ? 410-el*.04 : -10+el*.04; if(x<-15||x>415) W.rab=null; else drawRabbit(fctx, x, 584-Math.abs(Math.sin(el/170))*6, 584, W.rab.dir); } }
   }
   if(t==='night' && W.owl){ const pp=W.owl; drawOwl(fctx, pp.x+2*pp.s, pp.y-plantH(2,pp.s)*.98, pp.s*1.05, now); }
+  // Habitat responses: food attracts a rabbit that approaches, lowers its head and eats.
+  const care=viewing().care||{};
+  if(care.nest){
+    drawSparrow(fctx,326,296+(live?Math.sin(now/650)*.7:0),1,1.7);
+    if(live){const a=now/1600;drawSparrow(fctx,330+Math.cos(a)*22,281+Math.sin(a)*9,-1,1.2);}
+  }
+  if(care.bath){drawSparrow(fctx,73,451+(live?Math.sin(now/400)*.6:0),-1,1.3);}
+  if(care.foodDay===gardenDay()){
+    if(!W.feed || W.feed.day!==care.foodDay) W.feed={day:care.foodDay,start:now};
+    const age=now-W.feed.start, approach=live?Math.min(1,age/3500):1;
+    const x=365-approach*75, bob=approach===1 && live?Math.sin(now/170)*.7:0;
+    fctx.save();fctx.translate(x,516+bob);fctx.scale(3.3,3.3);
+    drawRabbit(fctx,0,0,0,1); // nose points toward the grass bowl
+    if(approach===1){fctx.fillStyle='#88a44e';ell(fctx,4,-.3+(live?Math.sin(now/100)*.3:0),1.5,.45);}
+    fctx.restore();
+  } else W.feed=null;
   // gust
   if(live && now > W.nextGust && $('sheet').hidden){ W.gustUntil = now + 2600; W.nextGust = now + rand(16000, 28000); const m=$('mid'); m.classList.add('gusting'); setTimeout(()=>m.classList.remove('gusting'), 2700); AU.gust(); }
   if(live && now < W.gustUntil){ if(Math.random()<.5) spawn('dust', -5, rand(220,560), 1, {vx:rand(.18,.3), vy:rand(-.01,.01), smin:0, smax:.01, lmin:1500, lmax:2200, c:'rgba(240,220,170,.6)', rmin:.6, rmax:1.4}); if(Math.random()<.08 && t!=='night') spawn('leaf', -5, rand(200,330), 1, {vx:rand(.12,.2), vy:rand(.0,.03), smin:0,smax:.01, g:.00002, lmin:2200, lmax:3000, c:'#6aa04a', rmin:1.2, rmax:1.8}); }
@@ -1011,9 +1053,9 @@ function resCond(id, oa, li){
     case 'fish': return oa.lanterns>=1;
     case 'butterflies': return flw>=1;
     case 'ducks': return g>=4;
-    case 'sparrows': return trees>=2;
+    case 'sparrows': return trees>=2 || !!oa.care?.nest;
     case 'bees': return flw>=3;
-    case 'rabbit': return g>=8;
+    case 'rabbit': return g>=8 || !!oa.care?.foodDay;
     case 'hoopoe': return S.daysActive>=7 && trees>=1;
     case 'owl': return oa.lanterns>=3 && trees>=1;
     case 'camel': return g>=Math.ceil(LOCS[li].plots*.7);
@@ -1251,6 +1293,45 @@ function renderMap(){
   });
   $('journey').innerHTML = html;
 }
+
+/* ================= optional garden care and quests ================= */
+function gardenDay(){const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate();}
+function gardenQuests(oa){
+ const planted=oa.plots.filter(Boolean), pos=plotPositions(LOCS[S.viewLoc].plots), care=oa.care||{};
+ const near=pos.some(p=>oa.plots[p.i] && Math.hypot((p.x-200)/1.5,p.y-418)<102);
+ const far=pos.some(p=>oa.plots[p.i] && Math.hypot((p.x-200)/1.5,p.y-418)>155);
+ return [
+  ['أول بذرة',planted.length>=1,'اغرس أي نبتة في بقعة فارغة.'],
+  ['لون من الزهور',planted.some(p=>PLANTS[p.plant].flower),'أضف نباتًا مزهرًا لتجذب الفراشات بعد نموه.'],
+  ['قرب العين',near,'اغرس بذرة في إحدى البقع قرب الماء.'],
+  ['حياة في الرمل',far,'اغرس بذرة بعيدة عن العين أيضًا.'],
+  ['تنوع جميل',new Set(planted.map(p=>p.plant)).size>=3,'اجمع ثلاثة أنواع مختلفة من النباتات.'],
+  ['ظل يتسع',planted.filter(p=>PLANTS[p.plant].tree && p.stage===2).length>=2,'أكمل نمو شجرتين.'],
+  ['بيت للعصافير',!!care.nest,'ابنِ عشًا وشاهد العصافير تسكنه.'],
+  ['رفق بالأرنب',!!care.foodDay,'ضع الطعام وشاهد الأرنب يأتي ليأكل.'],
+  ['سقيا صغيرة',!!care.bath,'أنشئ سقاية للطيور قرب العين.'],
+  ['واحة مزدهرة',grownCount(oa)>=8,'أكمل نمو ثماني نبتات.'],
+  ['نور المساء',oa.lanterns>=1,'أكمل عادات يومك لكسب فانوس.'],
+  ['رحلة تستمر',!!oa.complete,'أكمل الواحة وافتح محطتك التالية.']
+ ];
+}
+function careSheet(){
+ const oa=viewing(), care=oa.care||{}, visit=isVisiting();
+ const quests=gardenQuests(oa), finished=quests.filter(q=>q[1]).length;
+ const options=[['nest','عش العصافير','قطرتا ماء · مأوى دائم؛ تأتي العصافير وتسكنه.',2,!!care.nest],['food','طعام الأرنب','قطرة ماء · يأتي الأرنب ليأكل. يمكنك تجديد الطعام يوميًا.',1,care.foodDay===gardenDay()],['bath','سقاية الطيور','قطرتا ماء · سقاية دائمة تزورها الطيور.',2,!!care.bath]];
+ openSheet('<h2>حياة تنمو في واحتك</h2><p>العناية اختيارية وتستخدم ماء الواحة، ولا تسجّل عبادة أو تمنح نقاط صلاة. معك '+ar(S.drops)+' قطرات.</p><div class="care-list">'+options.map(([id,name,hint,cost,done])=>'<div class="care-item"><b>'+name+'</b><p>'+hint+'</p><button data-care="'+id+'" '+(visit||done||S.drops<cost?'disabled':'')+'>'+(done?'✓ موجود اليوم':visit?'واحة للزيارة':S.drops<cost?'تحتاج '+ar(cost)+' قطرات':id==='food'?'ضع الطعام الآن':'أنشئ الآن')+'</button></div>').join('')+'</div><h3>مهام الواحة · '+ar(finished)+' / '+ar(quests.length)+'</h3>'+quests.map(q=>'<div class="quest-row"><b>'+(q[1]?'✓':'○')+'</b><div><b>'+q[0]+'</b><span>'+q[2]+'</span></div></div>').join('')+'<button class="secondary" id="careClose">العودة إلى الواحة</button>');
+ $('careClose').onclick=closeSheet;
+ $('sheetBody').querySelectorAll('[data-care]').forEach(b=>b.onclick=()=>{
+  if(isVisiting())return;
+  const id=b.dataset.care, cost=id==='food'?1:2, c=cur().care||(cur().care={});
+  if(S.drops<cost || (id==='food'?c.foodDay===gardenDay():c[id]))return;
+  S.drops-=cost;if(id==='food')c.foodDay=gardenDay();else c[id]=true;
+  save();closeSheet();renderAll();checkResidents();rebuildAnimals();
+  toast(id==='food'?'انتظر قليلًا… الأرنب قادم إلى الطعام.':id==='nest'?'أصبح للعصافير بيت في واحتك.':'سقاية صغيرة، وحياة جديدة قرب الماء.');
+ });
+}
+$('careBtn').onclick=careSheet;
+
 function renderAll(anim){ renderScene(anim); renderPurse(); renderProgress(); renderHint(); renderHabits(); if(!$('page').hidden){ renderMap(); renderResidents(); } }
 
 /* ================= feedback ================= */

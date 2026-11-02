@@ -598,7 +598,7 @@ export default function SiragHome({ navigation }: any) {
               style={s.addHabit}
             >
               <SirajIcon name="plus" size={15} color={palette.accent} />
-              <Text style={s.textLink}>إضافة عادة</Text>
+              <Text style={s.textLink}>إضافة أو إدارة العادات</Text>
             </Pressable>
           </View>
           <View style={s.tools}>

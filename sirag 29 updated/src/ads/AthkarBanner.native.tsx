@@ -1,3 +1,4 @@
+import BannerPreview from "./BannerPreview";
 import React, { useEffect, useState } from "react";
 import {
   Pressable,
@@ -37,8 +38,16 @@ export default function AthkarBanner({ placement }: { placement: 1 | 2 }) {
       active = false;
     };
   }, [support.available, support.unitId]);
-  if (!ready || failed || !native || !support.unitId || width < 348)
-    return null;
+  if (!support.available)
+    return __DEV__ ? <BannerPreview placement={placement} /> : null;
+  if (failed)
+    return support.test ? (
+      <BannerPreview
+        placement={placement}
+        message="تعذّر تحميل إعلان Google التجريبي. هذا هو موضعه؛ تأكد من الاتصال ثم أعد فتح الأذكار."
+      />
+    ) : null;
+  if (!ready || !native || !support.unitId || width < 320) return null;
   const Banner = native.Banner;
   return (
     <View style={s.gap} accessibilityLabel={`مساحة إعلان ${placement}`}>
@@ -68,6 +77,7 @@ const s = StyleSheet.create({
     paddingVertical: 16,
     gap: 8,
     marginTop: 12,
+    marginHorizontal: -14,
     borderTopWidth: 1,
     borderColor: C.line,
   },

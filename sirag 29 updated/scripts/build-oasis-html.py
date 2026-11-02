@@ -45,6 +45,10 @@ rep("try{ const raw = localStorage.getItem(KEY); S = raw ? JSON.parse(raw) : fre
 rep("function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }",
     "let saveT = 0;\nfunction save(){ if(BRIDGE){ clearTimeout(saveT); saveT = setTimeout(()=>toRN({type:'save', state:S}), 250); return; } try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }")
 
+# Habitat actions must reach native storage before the user immediately navigates away.
+rep("save();closeSheet();renderAll();checkResidents();rebuildAnimals();",
+    "save(); if(BRIDGE){ clearTimeout(saveT); toRN({type:'save', state:S}); } closeSheet();renderAll();checkResidents();rebuildAnimals();")
+
 # haptics through expo-haptics
 rep("function buzz(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }",
     "function buzz(ms){ if(BRIDGE){ toRN({type:'haptic', kind: Array.isArray(ms) ? 'success' : (ms>=16 ? 'medium' : 'light')}); return; } try{ if(navigator.vibrate) navigator.vibrate(ms); }catch(e){} }")
