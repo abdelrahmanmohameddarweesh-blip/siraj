@@ -14,19 +14,21 @@ async function main() {
     ["assets/store/icon.png", 1024, true],
     ["store-listing/icon-512.png", 512, true],
   ]) {
-    // Adaptive artwork must fit Android's central safe area. The legacy/store
+    // Preserve the approved full-colour square, including its emerald background.
+    // The padded foreground covers the launcher mask, with the calligraphy
+    // inside Android's central safe area. The legacy/store
     // icon can use more of the opaque square because it isn't overscanned.
-    const artworkSize = opaque ? size : Math.round(size * 0.78);
+    const artworkSize = opaque ? size : Math.round(size * 0.74);
     const result = await generateImageAsync(
       { projectRoot, cacheType: "siraj-brand-icons" },
       {
         src,
-        name: path.basename(file),
+        name: `${path.basename(file, ".png")}-${artworkSize}.png`,
         width: artworkSize,
         height: artworkSize,
         resizeMode: "contain",
         ...(opaque
-          ? { backgroundColor: "#082B2A", removeTransparency: true }
+          ? { backgroundColor: "#0C3D31", removeTransparency: true }
           : {}),
       },
     );

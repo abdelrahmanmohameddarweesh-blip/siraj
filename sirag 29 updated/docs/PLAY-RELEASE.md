@@ -6,6 +6,8 @@
 
 > Prayer sound choices and bundled audio require a new native build: [notification sounds](NOTIFICATION-SOUNDS.md).
 
+> Latest approved icon and closed-test build instructions: [calligraphic icon and closed testing](ICON-AND-CLOSED-TESTING.md). Version 8 still has the previous icon.
+
 ## Current state — not published
 
 The owner has an existing Play developer account, so this workflow does not need another registration. Support/privacy email: `abdelrahman.mohamed.darweesh@gmail.com`. The existing Play Console developer display name has not been changed.
@@ -14,7 +16,7 @@ Prepared in source:
 
 - Installed app label localized as `Siraj` / `سراج` by phone language, store listing translations managed separately, version `1.0.0`, initial Android versionCode `1`.
 - Android package `com.sirag.livingdesert`. Confirm this before the first upload; a published app's package is permanent. If it already exists in your Play Console, keep its existing signing/upload-key setup and increment its version code.
-- Original generated lantern icon and a 512×512 Play icon export; 1024×500 feature graphic.
+- Approved uploaded calligraphic سراج icon and a 512×512 Play icon export; existing 1024×500 feature graphic.
 - `play-internal` / `production` EAS profiles produce an Android App Bundle (.aab). They use remote build-number increments. Internal builds use test ads; production uses live Android rewarded ads and live banners when the separate banner ID has been supplied.
 - A separate APK `preview` profile remains available for adult developer testing, with Google test rewarded ads. Live Android monetization has been requested by the owner; account readiness and native ad behavior still need verification before public release.
 - In-app account/data deletion with an interrupted-deletion checkpoint, cloud-sync blocking and device/context reset; private/profile/report rules adjusted for owner deletion.
