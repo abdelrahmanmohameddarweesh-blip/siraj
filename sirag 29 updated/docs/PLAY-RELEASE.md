@@ -4,6 +4,8 @@
 
 > Latest UI and oasis changes: [daily tracking and oasis care](OASIS-CARE-AND-DAILY-TRACKING.md).
 
+> Prayer sound choices and bundled audio require a new native build: [notification sounds](NOTIFICATION-SOUNDS.md).
+
 ## Current state — not published
 
 The owner has an existing Play developer account, so this workflow does not need another registration. Support/privacy email: `abdelrahman.mohamed.darweesh@gmail.com`. The existing Play Console developer display name has not been changed.

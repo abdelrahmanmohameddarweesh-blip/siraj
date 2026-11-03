@@ -1,5 +1,6 @@
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { foregroundSound } from "../notifications/soundPolicy";
+import { AppState, Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   ensureChannels,
@@ -38,9 +39,11 @@ Notifications.setNotificationHandler({
     shouldShowList: !(
       Platform.OS === "ios" && n?.request?.content?.data?.attention === "1"
     ),
-    shouldPlaySound:
-      n?.request?.content?.data?.attention !== "1" &&
-      (n?.request?.content?.data as any)?.type !== "prayer_athan",
+    shouldPlaySound: foregroundSound(
+      n.request.content.data || {},
+      n.request.content.sound,
+      AppState.currentState === "active",
+    ),
     shouldSetBadge: typeof n?.request?.content?.badge === "number",
   }),
 });

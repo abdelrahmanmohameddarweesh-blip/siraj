@@ -1,3 +1,4 @@
+import NotificationSoundSettings from "./NotificationSoundSettings";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -81,7 +82,9 @@ export default function PrayerRemindersScreen({ navigation, route }: any) {
         ...patch,
         reminderIntensity:
           patch.reminderIntensity ||
-          ("personalizedNotifications" in patch || "badgesEnabled" in patch
+          ("personalizedNotifications" in patch ||
+          "badgesEnabled" in patch ||
+          "sounds" in patch
             ? config.reminderIntensity
             : "custom"),
       });
@@ -177,6 +180,11 @@ export default function PrayerRemindersScreen({ navigation, route }: any) {
             📍 {location.cityNameAr} · {METHODS[method]}
           </Text>
         </View>
+        <NotificationSoundSettings
+          value={config.sounds}
+          busy={busy}
+          onChange={(sounds) => update({ sounds })}
+        />
         <Pressable
           accessibilityRole="button"
           onPress={() => setAccuracy(!accuracy)}
@@ -445,7 +453,9 @@ export default function PrayerRemindersScreen({ navigation, route }: any) {
                   </View>
                   {cfg.athanEnabled !== false && (
                     <View style={s.row}>
-                      <Text style={s.label}>صوت الأذان</Text>
+                      <Text style={s.label}>
+                        تفعيل الصوت المختار لهذه الصلاة
+                      </Text>
                       <Switch
                         disabled={busy}
                         value={cfg.sound}

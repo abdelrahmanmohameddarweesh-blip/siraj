@@ -1,3 +1,8 @@
+import {
+  plannedSound,
+  type SoundPreferences,
+  type PlannedSound,
+} from "./soundPolicy";
 import { pendingActions, badgeGrace } from "./badgeModel";
 import { personalizeBody } from "./personalization";
 /**
@@ -41,6 +46,7 @@ export type DayTimes = {
   isha: Date;
 };
 export type PrayerSettings = {
+  sounds?: SoundPreferences;
   enabled: boolean;
   perPrayer: Record<
     PrayerId,
@@ -61,7 +67,7 @@ export type Planned = {
   body: string;
   channel: "athan" | "checkin" | "habits" | "silent" | "attention";
   badge?: number;
-  sound: "athan" | "default" | null;
+  sound: PlannedSound;
   data: Record<string, string>;
 };
 export type PlanInput = {
@@ -152,7 +158,7 @@ export function buildSchedule(input: PlanInput): Planned[] {
             title: `${PRAYER_AR[p]} بعد ${pre.toLocaleString("ar-EG")} دقائق`,
             body: "وقت مناسب للوضوء والاستعداد.",
             channel: "checkin",
-            sound: "default",
+            sound: plannedSound(s.sounds, "wudu"),
             data: { type: "prayer_pre", prayer: p, date: day.dateStr },
           });
         if (cfg.athanEnabled !== false)
@@ -162,8 +168,15 @@ export function buildSchedule(input: PlanInput): Planned[] {
             title: `حان الآن وقت صلاة ${PRAYER_AR[p]} 🕌`,
             body: "حيّ على الصلاة، حيّ على الفلاح.",
             channel: cfg.sound ? "athan" : "silent",
-            sound: cfg.sound ? "athan" : null,
-            data: { type: "prayer_athan", prayer: p, date: day.dateStr },
+            sound: cfg.sound ? plannedSound(s.sounds, "adhan") : null,
+            data: {
+              type: "prayer_athan",
+              prayer: p,
+              date: day.dateStr,
+              soundId: cfg.sound
+                ? plannedSound(s.sounds, "adhan") || "silent"
+                : "silent",
+            },
           });
         const done = COUNTED.has(
           String(input.checkins[`${p}_${day.dateStr}`]?.status),
@@ -180,7 +193,7 @@ export function buildSchedule(input: PlanInput): Planned[] {
             title: `هل صليت ${PRAYER_AR[p]}؟`,
             body: "اضغط لتسجيل صلاتك.",
             channel: "checkin",
-            sound: "default",
+            sound: plannedSound(s.sounds, "reminder"),
             data: { type: "prayer_checkin", prayer: p, date: day.dateStr },
           });
       }

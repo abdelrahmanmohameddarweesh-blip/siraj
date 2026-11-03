@@ -1,3 +1,4 @@
+import { selectedSound } from "./soundPolicy";
 import { syncAppBadge } from "./badgeService";
 /** Routes notification taps and plays the full adhan only while the app is active. */
 import { useEffect, useRef } from "react";
@@ -100,7 +101,9 @@ export function useNotificationRouter(
         !settings.enabled ||
         !prayer?.enabled ||
         prayer.athanEnabled === false ||
-        !prayer.sound
+        !prayer.sound ||
+        selectedSound(settings.sounds, "adhan") !== "athan" ||
+        (d.soundId !== undefined && d.soundId !== "athan")
       )
         return;
       try {

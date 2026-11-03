@@ -1,3 +1,4 @@
+import type { SoundPreferences } from "../notifications/soundPolicy";
 export type CalculationMethodName =
   | 'Egyptian'
   | 'UmmAlQura'
@@ -35,6 +36,7 @@ export interface PrayerTimesDay {
 
 export interface PrayerNotificationConfig {
   notificationsEnabled: boolean;
+  sounds?: SoundPreferences;
   personalizedNotifications?: boolean;
   badgesEnabled?: boolean;
   reminderIntensity?: 'gentle' | 'steady' | 'strong' | 'custom';

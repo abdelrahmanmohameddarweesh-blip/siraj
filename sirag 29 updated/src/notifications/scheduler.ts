@@ -1,3 +1,11 @@
+import {
+  plannedSound,
+  soundFile,
+  soundChannel,
+  prayerSoundRole,
+  SOUND_OPTIONS,
+  type SoundRole,
+} from "./soundPolicy";
 import { syncAppBadge } from "./badgeService";
 import { hasPlantableSeeds } from "./badgeModel";
 /** Applies the notification plan with expo-notifications. Only touches notifications it owns. */
@@ -53,6 +61,7 @@ export function settingsFromConfig(
     };
   return {
     enabled: c?.notificationsEnabled ?? true,
+    sounds: c?.sounds,
     perPrayer: per,
     followUp: c?.checkinFollowUpEnabled ?? true,
     followUpMin: { ...DEFAULT_FOLLOW_UP, ...(c?.followUpMin || {}) },
@@ -79,13 +88,27 @@ export async function ensureChannels() {
     },
   ]);
   if (Platform.OS !== "android") return;
-  // Android fixes a channel's sound when it is created, so the adhan gets its own channel.
-  await Notifications.setNotificationChannelAsync(CHANNELS.athan, {
-    name: "الأذان",
-    importance: Notifications.AndroidImportance.HIGH,
-    sound: "athan.wav",
-    vibrationPattern: [0, 300, 200, 300],
-  });
+  const prefs = (await loadPrayerSettings()).sounds;
+  for (const role of Object.keys(SOUND_OPTIONS) as SoundRole[]) {
+    const choice = plannedSound(prefs, role);
+    for (const sound of new Set([choice, null])) {
+      const option = SOUND_OPTIONS[role].find(
+        (o) => o.id === (sound || "silent"),
+      );
+      await Notifications.setNotificationChannelAsync(
+        soundChannel(role, sound),
+        {
+          name: `${role === "adhan" ? "الأذان" : role === "wudu" ? "الوضوء" : "تذكير الصلاة"} · ${option?.label || "صامت"}`,
+          importance:
+            role === "adhan"
+              ? Notifications.AndroidImportance.HIGH
+              : Notifications.AndroidImportance.DEFAULT,
+          sound: soundFile(sound),
+          vibrationPattern: sound ? [0, 200, 150, 200] : [],
+        },
+      );
+    }
+  }
   await Notifications.setNotificationChannelAsync(CHANNELS.silent, {
     name: "مواقيت الصلاة بدون صوت",
     importance: Notifications.AndroidImportance.HIGH,
@@ -219,17 +242,20 @@ export async function syncNotifications(
         (await Notifications.getExactAlarmPermissionsAsync()).granted;
       // Include delivery mode in the signature so granting exact-alarm access
       // upgrades already scheduled best-effort adhans instead of retaining them.
-      const planned = (await planNow()).slice(0, capacity).map((n) =>
-        n.data.type === "prayer_athan"
-          ? {
-              ...n,
-              data: {
-                ...n.data,
-                deliveryMode: exact ? "alarmClock" : "bestEffort",
-              },
-            }
-          : n,
-      );
+      const planned = (await planNow()).slice(0, capacity).map((n) => {
+        const role = prayerSoundRole(n.data.type);
+        if (!role) return n;
+        return {
+          ...n,
+          data: {
+            ...n.data,
+            soundChannel: soundChannel(role, n.sound),
+            ...(role === "adhan"
+              ? { deliveryMode: exact ? "alarmClock" : "bestEffort" }
+              : {}),
+          },
+        };
+      });
       const sig = JSON.stringify(planned);
       const stored = await AsyncStorage.getItem(SIG_KEY);
       if (
@@ -269,12 +295,14 @@ export async function syncNotifications(
             ...(n.data.type === "prayer_checkin"
               ? { categoryIdentifier: "PRAYER_CHECKIN_CATEGORY" }
               : {}),
-            sound: n.sound === "athan" ? "athan.wav" : n.sound ? true : false,
+            sound: soundFile(n.sound) || false,
           },
           trigger: {
             type: Notifications.SchedulableTriggerInputTypes.DATE,
             date: n.at,
-            channelId: CHANNELS[n.channel],
+            channelId: prayerSoundRole(n.data.type)
+              ? soundChannel(prayerSoundRole(n.data.type)!, n.sound)
+              : CHANNELS[n.channel],
             delivery:
               n.data.deliveryMode === "alarmClock"
                 ? "alarmClock"

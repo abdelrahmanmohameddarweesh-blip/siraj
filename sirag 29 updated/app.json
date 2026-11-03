@@ -70,7 +70,12 @@
         "expo-notifications",
         {
           "sounds": [
-            "./assets/sounds/athan.wav"
+            "./assets/sounds/athan.wav",
+            "./assets/sounds/wudu_drop.wav",
+            "./assets/sounds/wudu_soft.wav",
+            "./assets/sounds/prayer_bell.wav",
+            "./assets/sounds/prayer_soft.wav",
+            "./assets/sounds/gentle.wav"
           ],
           "color": "#1d5c49"
         }
