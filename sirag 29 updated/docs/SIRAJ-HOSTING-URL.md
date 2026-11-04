@@ -13,7 +13,13 @@ npx firebase-tools hosting:sites:create siraj-livingdesert --project batal-mosle
 
 If Firebase says the site ID is taken, stop and choose another available Siraj-based ID. Use that exact ID in all following commands. The existing site's `batal-moslem.web.app` address cannot simply be renamed into `siraj.web.app` if someone else owns that name.
 
-After site creation succeeds:
+After site creation succeeds, if the original policy pages have never been deployed, publish the current/default Hosting site once **before** switching targets, so existing installed versions retain working legal links:
+
+```sh
+npx firebase-tools deploy --only hosting --project batal-moslem
+```
+
+Then configure and publish the new site:
 
 ```sh
 npm run hosting:configure -- siraj-livingdesert
