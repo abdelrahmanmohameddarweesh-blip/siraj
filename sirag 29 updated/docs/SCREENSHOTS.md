@@ -29,3 +29,19 @@ Captured from the current Home route at 390 × 844, 2× pixel density, with the 
 ![Homepage in light appearance](previews/homepage-light.png)
 
 ![Homepage in dark appearance](previews/homepage-dark.png)
+
+## Completed oasis and activity reports
+
+These web previews use isolated local fixtures at a 390 × 844 viewport and 2× pixel density. Cloud requests were blocked; no real user progress was changed. Both oasis states and the reports route loaded without JavaScript exceptions. These are not screenshots captured from an installed Android app.
+
+- Completed beginning oasis: 16 grown plants with resident and care fixtures.
+- Completed Garden of Light: 32 grown plants, resident animals, nest, bird bath and rabbit food; daytime rendering means nocturnal residents are not all visible.
+- Reports: seven sample days ending 4 November 2026, including prayer records, Quran pages/listening, adhkar and memorization data. All values are illustrative local fixtures, not real user achievements.
+
+![Completed oasis](previews/oasis-complete.png)
+
+![Completed Garden of Light](previews/oasis-complete-garden.png)
+
+![Reports overview with sample activity](previews/reports-overview.png)
+
+![Reports chart and details](previews/reports-charts.png)
