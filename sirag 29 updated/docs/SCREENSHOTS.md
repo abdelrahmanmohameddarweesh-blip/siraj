@@ -13,3 +13,11 @@ Captured during browser checks at phone-sized viewports. The report uses sample 
 
 ## Prayer reminder settings
 ![Independent before/at/after prayer settings](screenshots/prayer-reminders.png)
+
+## Habit library
+
+Captured from the existing app's **Home → إضافة أو إدارة العادات** route at a 390 × 844 viewport, 2× pixel density. These are web previews, not installed Android screenshots. The management view uses two sample local plans in an isolated browser context; cloud requests were blocked. Both views loaded without JavaScript exceptions. No app behavior changed for these captures.
+
+![Searchable habit library](previews/habit-library.png)
+
+![Current habits and removal controls](previews/habit-management.png)
