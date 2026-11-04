@@ -21,3 +21,11 @@ Captured from the existing app's **Home → إضافة أو إدارة العا�
 ![Searchable habit library](previews/habit-library.png)
 
 ![Current habits and removal controls](previews/habit-management.png)
+
+## Current homepage: light and dark
+
+Captured from the current Home route at 390 × 844, 2× pixel density, with the guide dismissed and no activity recorded. The name and two habit plans are local browser fixtures; the clock is fixed to 4 November 2026, 10:30 in Cairo. Both themes loaded without JavaScript exceptions and cloud requests were blocked. These are web previews, not installed-device screenshots; no app behavior changed.
+
+![Homepage in light appearance](previews/homepage-light.png)
+
+![Homepage in dark appearance](previews/homepage-dark.png)
