@@ -14,7 +14,8 @@
     "web:preview": "npx expo export -p web --output-dir dist-web && npx serve dist-web",
     "play:check": "node scripts/check-play-release.cjs",
     "play:public-check": "node scripts/check-play-release.cjs --public",
-    "build:icons": "node scripts/build-icons.cjs"
+    "build:icons": "node scripts/build-icons.cjs",
+    "hosting:configure": "node scripts/configure-hosting-site.cjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",
